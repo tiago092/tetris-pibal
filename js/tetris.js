@@ -293,7 +293,7 @@ function drawMenuBg() {
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
   if (menuImg.complete && menuImg.naturalWidth) {
     ctx.save();
-    ctx.filter = 'brightness(0.50) saturate(1.6) contrast(1.05)';
+    ctx.filter = 'brightness(0.80) saturate(1.6) contrast(1.05)';
     ctx.drawImage(menuImg, 0, 0, W, H);
     ctx.filter = 'none';
     ctx.restore();
@@ -301,6 +301,8 @@ function drawMenuBg() {
     vig.addColorStop(0, 'rgba(0,0,0,0.15)');
     vig.addColorStop(1, 'rgba(0,0,0,0.68)');
     ctx.fillStyle = vig; ctx.fillRect(0, 0, W, H);
+    // overlay oscuro uniforme para consistencia entre pantallas
+    ctx.fillStyle = 'rgba(0,0,10,0.38)'; ctx.fillRect(0, 0, W, H);
   }
 }
 
@@ -594,62 +596,103 @@ function easeOutBounce(t) {
 
 function drawSideFrames(alpha) {
   if (alpha <= 0) return;
-  const frameW = 32, frameR = 6;
+  const frameW = 26, frameR = 3;
   ctx.save();
-  ctx.globalAlpha = alpha * 0.92;
-  for (const fx of [0, W - frameW]) {
-    const isLeft = fx === 0;
-    // base madera: gradiente cálido oscuro
-    ctx.beginPath(); ctx.roundRect(fx, 0, frameW, H, frameR);
-    const wood = ctx.createLinearGradient(fx, 0, fx + frameW, 0);
-    wood.addColorStop(0,   isLeft ? '#3d1e06' : '#1e0e02');
-    wood.addColorStop(0.3, isLeft ? '#6b3510' : '#5a2e0c');
-    wood.addColorStop(0.7, '#7a3e12');
-    wood.addColorStop(1,   isLeft ? '#4a2208' : '#6b3510');
-    ctx.fillStyle = wood; ctx.fill();
+  ctx.globalAlpha = alpha * 0.95;
 
-    // vetas de madera (líneas diagonales sutiles)
+  for (const fx of [0, W - frameW]) {
+    // fondo base: acero oscuro
+    ctx.beginPath(); ctx.roundRect(fx, 0, frameW, H, frameR);
+    const base = ctx.createLinearGradient(fx, 0, fx + frameW, 0);
+    base.addColorStop(0,   '#1a1a1e');
+    base.addColorStop(0.4, '#2a2a30');
+    base.addColorStop(0.7, '#222226');
+    base.addColorStop(1,   '#181818');
+    ctx.fillStyle = base; ctx.fill();
+
+    // cota de malla: anillos entrelazados
     ctx.save(); ctx.beginPath(); ctx.roundRect(fx, 0, frameW, H, frameR); ctx.clip();
-    ctx.lineWidth = 1;
-    for (let wy = -frameW; wy < H + frameW; wy += 9) {
-      const shade = (Math.floor(wy / 9) % 3 === 0) ? 'rgba(200,120,40,0.12)' : 'rgba(30,10,0,0.10)';
-      ctx.strokeStyle = shade;
-      ctx.beginPath();
-      ctx.moveTo(fx,          wy);
-      ctx.lineTo(fx + frameW, wy + frameW * 0.6);
-      ctx.stroke();
+
+    const rW = 16, rH = 10, cols = Math.ceil(frameW / rW) + 1;
+    const rows = Math.ceil(H / rH) + 2;
+
+    for (let row = -1; row < rows; row++) {
+      const offsetX = (row % 2 === 0) ? 0 : rW / 2;
+      for (let col = -1; col < cols; col++) {
+        const cx3 = fx + col * rW + offsetX;
+        const cy3 = row * rH;
+
+        // sombra del anillo (profundidad)
+        ctx.beginPath();
+        ctx.ellipse(cx3 + 0.5, cy3 + 1, rW / 2 - 0.5, rH / 2 - 0.5, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(0,0,0,0.65)';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // anillo principal: gradiente gris metálico
+        const ringGrad = ctx.createLinearGradient(cx3 - rW/2, cy3 - rH/2, cx3 + rW/2, cy3 + rH/2);
+        ringGrad.addColorStop(0,   'rgba(210,215,220,0.90)');
+        ringGrad.addColorStop(0.4, 'rgba(130,138,145,0.80)');
+        ringGrad.addColorStop(0.7, 'rgba(85,90,96,0.85)');
+        ringGrad.addColorStop(1,   'rgba(175,182,188,0.75)');
+        ctx.beginPath();
+        ctx.ellipse(cx3, cy3, rW / 2 - 0.5, rH / 2 - 0.5, 0, 0, Math.PI * 2);
+        ctx.strokeStyle = ringGrad;
+        ctx.lineWidth = 2.2;
+        ctx.stroke();
+
+        // reflejo superior del anillo
+        ctx.beginPath();
+        ctx.ellipse(cx3, cy3 - rH * 0.12, rW / 2 - 2.5, rH / 2 - 2.5, 0, Math.PI, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(240,245,250,0.50)';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
+      }
     }
     ctx.restore();
 
-    // borde dorado sutil (sin glow)
-    ctx.strokeStyle = 'rgba(160,110,20,0.7)'; ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.roundRect(fx + 1, 1, frameW - 2, H - 2, frameR); ctx.stroke();
+    // velo lateral: gradiente de oscurecimiento hacia el borde exterior
+    ctx.save(); ctx.beginPath(); ctx.roundRect(fx, 0, frameW, H, frameR); ctx.clip();
+    const veil = ctx.createLinearGradient(fx, 0, fx + frameW, 0);
+    const dark = 'rgba(0,0,0,0.45)', clear = 'rgba(0,0,0,0.00)';
+    if (fx === 0) { veil.addColorStop(0, dark); veil.addColorStop(0.5, clear); veil.addColorStop(1, clear); }
+    else          { veil.addColorStop(0, clear); veil.addColorStop(0.5, clear); veil.addColorStop(1, dark); }
+    ctx.fillStyle = veil; ctx.fillRect(fx, 0, frameW, H);
+    ctx.restore();
 
-    // línea interior más clara
-    const innerX = isLeft ? fx + frameW - 4 : fx + 4;
-    ctx.strokeStyle = 'rgba(210,155,40,0.35)'; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(innerX, 12); ctx.lineTo(innerX, H - 12); ctx.stroke();
-
-    // pequeño rombo central decorativo
-    const cx2 = fx + frameW / 2, cy2 = H / 2;
-    ctx.fillStyle = 'rgba(200,145,30,0.55)';
-    ctx.beginPath();
-    ctx.moveTo(cx2,      cy2 - 10);
-    ctx.lineTo(cx2 + 7,  cy2);
-    ctx.lineTo(cx2,      cy2 + 10);
-    ctx.lineTo(cx2 - 7,  cy2);
-    ctx.closePath(); ctx.fill();
-    // rombo inferior
-    ctx.fillStyle = 'rgba(180,120,20,0.35)';
-    for (const offset of [-H * 0.28, H * 0.28]) {
-      ctx.beginPath();
-      ctx.moveTo(cx2,     cy2 + offset - 7);
-      ctx.lineTo(cx2 + 5, cy2 + offset);
-      ctx.lineTo(cx2,     cy2 + offset + 7);
-      ctx.lineTo(cx2 - 5, cy2 + offset);
-      ctx.closePath(); ctx.fill();
-    }
+    // borde exterior: filo metálico triple
+    ctx.save();
+    ctx.beginPath(); ctx.roundRect(fx + 0.5, 0.5, frameW - 1, H - 1, frameR);
+    ctx.strokeStyle = 'rgba(15,15,18,0.95)'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(fx + 2, 2, frameW - 4, H - 4, frameR);
+    ctx.strokeStyle = 'rgba(190,195,200,0.35)'; ctx.lineWidth = 0.75; ctx.stroke();
+    ctx.beginPath(); ctx.roundRect(fx + 3, 3, frameW - 6, H - 6, frameR);
+    ctx.strokeStyle = 'rgba(10,10,12,0.40)'; ctx.lineWidth = 0.5; ctx.stroke();
+    ctx.restore();
   }
+  ctx.restore();
+}
+
+function drawTitleBox(y, fontSize, alpha=1) {
+  const tbW = 460, tbH = fontSize * 1.65, tbX = W/2 - tbW/2, tbY = y - tbH/2 - 2;
+  ctx.save();
+  ctx.globalAlpha = alpha * 0.88;
+  const tbGrad = ctx.createLinearGradient(tbX, tbY, tbX, tbY + tbH);
+  tbGrad.addColorStop(0,   'rgba(45,47,52,0.88)');
+  tbGrad.addColorStop(0.5, 'rgba(60,62,68,0.84)');
+  tbGrad.addColorStop(1,   'rgba(45,47,52,0.88)');
+  ctx.fillStyle = tbGrad;
+  ctx.beginPath(); ctx.roundRect(tbX, tbY, tbW, tbH, 8); ctx.fill();
+  // borde gris claro
+  const tbBorder = ctx.createLinearGradient(tbX, tbY, tbX + tbW, tbY);
+  tbBorder.addColorStop(0,   'rgba(180,180,190,0.30)');
+  tbBorder.addColorStop(0.3, 'rgba(220,220,230,0.80)');
+  tbBorder.addColorStop(0.7, 'rgba(220,220,230,0.80)');
+  tbBorder.addColorStop(1,   'rgba(180,180,190,0.30)');
+  ctx.strokeStyle = tbBorder; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.roundRect(tbX, tbY, tbW, tbH, 8); ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(tbX + 3, tbY + 3, tbW - 6, tbH - 6, 6); ctx.stroke();
   ctx.restore();
 }
 
@@ -658,6 +701,7 @@ function drawMenu(now) {
 
   if (!menuUnlocked) {
     // título estático antes de desbloquear
+    drawTitleBox(110, 52);
     drawBrickTitle('TETRIS PIBAL', W/2, 110, 52);
     menuPulse += 0.04;
     const a = 0.55 + 0.45 * Math.sin(menuPulse);
@@ -674,6 +718,7 @@ function drawMenu(now) {
   const titleT  = Math.min(1, age / ANIM_DUR);
   const titleY  = -80 + (110 + 80) * easeOutBounce(titleT);  // cae desde arriba
 
+  drawTitleBox(titleY, 52, titleT);
   drawBrickTitle('TETRIS PIBAL', W/2, titleY, 52);
 
   // marcos laterales de madera
@@ -696,22 +741,26 @@ function drawMenu(now) {
     if (sel) {
       const sc = 1 + 0.04 * Math.sin(menuPulse * 2);
       ctx.translate(W/2, cy); ctx.scale(sc, sc); ctx.translate(-W/2, -cy);
-      // sombra difusa detrás del texto seleccionado
-      ctx.shadowColor = 'rgba(255,180,0,0.85)'; ctx.shadowBlur = 28;
+      // sombra negra gruesa de fondo
+      ctx.shadowColor = 'rgba(0,0,0,1)'; ctx.shadowBlur = 22; ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 5;
       ctx.font = 'bold 27px monospace'; ctx.fillStyle = '#ffe600';
       ctx.fillText(opt, W/2, cy);
-      ctx.shadowColor = 'rgba(0,0,0,0.9)'; ctx.shadowBlur = 8; ctx.shadowOffsetY = 3;
+      // glow dorado
+      ctx.shadowColor = 'rgba(255,180,0,0.95)'; ctx.shadowBlur = 36; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
       ctx.fillText(opt, W/2, cy);
-      ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+      ctx.shadowBlur = 14;
+      ctx.fillText(opt, W/2, cy);
+      ctx.shadowBlur = 0;
       // flechas
       ctx.fillStyle = 'rgba(255,220,0,0.85)'; ctx.font = 'bold 18px monospace';
       ctx.fillText('▶', W/2 - 130, cy);
       ctx.fillText('◀', W/2 + 130, cy);
     } else {
-      ctx.shadowColor = 'rgba(0,0,0,0.95)'; ctx.shadowBlur = 14; ctx.shadowOffsetY = 3;
+      // sombra negra fuerte
+      ctx.shadowColor = 'rgba(0,0,0,1)'; ctx.shadowBlur = 18; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 4;
       ctx.font = 'bold 22px monospace'; ctx.fillStyle = '#dde0ff';
       ctx.fillText(opt, W/2, cy);
-      ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+      ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; ctx.shadowBlur = 0;
     }
     ctx.restore();
   });
@@ -723,7 +772,8 @@ function drawMenu(now) {
 function drawNameEntry() {
   drawMenuBg();
   drawSideFrames(1);
-  drawBrickTitle('TETRIS PIBAL', W/2, H*0.16, 44, false);
+  drawTitleBox(H*0.16, 52);
+  drawBrickTitle('TETRIS PIBAL', W/2, H*0.16, 52);
 
   // panel cálido
   const panW = 320, panH = 140, panX = W/2 - panW/2, panY = H*0.43;
@@ -943,6 +993,7 @@ function drawLeaderboard() {
 function drawCredits() {
   drawMenuBg();
   drawSideFrames(1);
+  drawTitleBox(72, 42);
   drawBrickTitle('TETRIS PIBAL', W/2, 72, 42, false);
 
   const panW = 340, panH = 330, panX = W/2 - panW/2, panY = 140;
