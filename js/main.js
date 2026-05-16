@@ -1,8 +1,3 @@
-// ---- Detección móvil ----
-if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || ('ontouchstart' in window)) {
-  document.body.classList.add('is-mobile');
-}
-
 // ---- Estado global de flujo ----
 let inMenu       = true;
 let inNameEntry  = false;
@@ -180,55 +175,6 @@ document.addEventListener('keydown', e => {
     doLock();
   }
 });
-
-// ---- Controles móvil ----
-function mobileMoveLeft()  { const t={...state.piece,x:state.piece.x-1}; if(valid(state.board,t))state.piece=t; }
-function mobileMoveRight() { const t={...state.piece,x:state.piece.x+1}; if(valid(state.board,t))state.piece=t; }
-function mobileMoveDown()  { const t={...state.piece,y:state.piece.y+1}; if(valid(state.board,t)){state.piece=t;state.lastFall=performance.now();} }
-function mobileRotate()    { const t={...state.piece,rot:state.piece.rot+1}; if(valid(state.board,t)){state.piece=t;playRotateSound();} }
-function mobileDrop()      { while(true){const t={...state.piece,y:state.piece.y+1};if(valid(state.board,t))state.piece=t;else break;} playHardDropSound(); doLock(); }
-
-function mobileGameActive() {
-  return !inMenu && !inNameEntry && !inDifficulty && !inLeaderboard && !inCredits && !inCountdown && !state.over && !state.won && !state.paused;
-}
-
-function bindMobileBtn(id, action) {
-  const btn = document.getElementById(id);
-  if (!btn) return;
-  let interval = null;
-  const start = () => {
-    unlockAudio();
-    if (!mobileGameActive()) {
-      if (inMenu && !menuUnlocked) { menuUnlocked=true; menuEnterTime=performance.now(); introMusic.play().catch(()=>{}); }
-      return;
-    }
-    action();
-    if (id === 'btn-left' || id === 'btn-right' || id === 'btn-down') {
-      interval = setInterval(() => { if (mobileGameActive()) action(); }, 120);
-    }
-  };
-  const stop = () => { clearInterval(interval); interval = null; };
-  btn.addEventListener('touchstart', e => { e.preventDefault(); start(); }, { passive: false });
-  btn.addEventListener('touchend',   e => { e.preventDefault(); stop();  }, { passive: false });
-  btn.addEventListener('mousedown',  e => { e.preventDefault(); start(); });
-  btn.addEventListener('mouseup',    e => { e.preventDefault(); stop();  });
-}
-
-bindMobileBtn('btn-left',   mobileMoveLeft);
-bindMobileBtn('btn-right',  mobileMoveRight);
-bindMobileBtn('btn-down',   mobileMoveDown);
-bindMobileBtn('btn-rotate', mobileRotate);
-bindMobileBtn('btn-drop',   mobileDrop);
-
-// tap en canvas para desbloquear audio/menú en móvil
-canvas.addEventListener('touchstart', e => {
-  e.preventDefault();
-  unlockAudio();
-  if (inMenu && !menuUnlocked) {
-    menuUnlocked = true; menuEnterTime = performance.now();
-    introMusic.play().catch(() => {});
-  }
-}, { passive: false });
 
 // ---- Game loop ----
 let lastTime = performance.now();

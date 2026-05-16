@@ -58,24 +58,15 @@ function drawBrickTitle(text, x, y, fontSize=52, bold=true) {
     ctx.textBaseline = 'middle';
     ctx.font = font;
 
-    // sombra difusa global
-    ctx.shadowColor = 'rgba(0,0,0,0.95)';
-    ctx.shadowBlur = 24;
-    ctx.shadowOffsetX = 4;
-    ctx.shadowOffsetY = 6;
-    ctx.fillStyle = 'rgba(0,0,0,0.85)';
-    ctx.fillText(ch, lx, y);
-    ctx.shadowBlur = 0; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
-
-    // sombra 3D abajo-derecha
-    for (let s = 10; s > 0; s--) {
-      ctx.fillStyle = `rgba(0,0,0,${0.6 - s * 0.05})`;
+    // sombra 3D abajo-derecha (reducida)
+    for (let s = 5; s > 0; s--) {
+      ctx.fillStyle = `rgba(0,0,0,${0.45 - s * 0.06})`;
       ctx.fillText(ch, lx + s, y + s);
     }
 
-    // contorno negro grueso
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 11;
+    // contorno fino
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
+    ctx.lineWidth = 4;
     ctx.lineJoin = 'round';
     ctx.strokeText(ch, lx, y);
 
