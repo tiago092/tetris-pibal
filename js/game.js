@@ -55,7 +55,7 @@ function applyLevelBg(level) {
       if (musicUnlocked) playMusic(level);
     } : null;
 
-    startLevelBgVideo(theme.bg.src, loop, onEnded, maxLoops, onLoopsComplete);
+    startLevelBgVideo(theme.bg.src, loop, onEnded, maxLoops, onLoopsComplete, !!theme.bg.muted);
     if (theme.bg.muted) levelBgVideo.muted = true;
     if (!maxLoops && theme.bg.nextAudio) startLevelBgAudio(theme.bg.nextAudio);
     if (theme.bg.keepMusic || theme.bg.muted) {

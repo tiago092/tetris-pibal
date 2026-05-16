@@ -26,6 +26,16 @@ function playWinSound() {
 const winMusic = new Audio(WIN_CONFIG.music);
 winMusic.loop = true;
 winMusic.volume = 0.8;
+winMusic.preload = 'auto';
+
+function drawMediaCover(media, x, y, w, h) {
+  const mw = media.videoWidth || media.naturalWidth || w;
+  const mh = media.videoHeight || media.naturalHeight || h;
+  const scale = Math.max(w / mw, h / mh);
+  const dw = mw * scale;
+  const dh = mh * scale;
+  ctx.drawImage(media, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+}
 
 function startWinAnim(score, _onRestart, onQuit) {
   stopLevelBgVideo();
@@ -146,13 +156,13 @@ function startWinAnim(score, _onRestart, onQuit) {
     updateFireworks(dt);
 
     ctx.fillStyle = '#0c0c16'; ctx.fillRect(0, 0, W, H);
-    if (winVideo.readyState >= 2) ctx.drawImage(winVideo, BX, BY, BW, BH);
-    ctx.fillStyle = `rgba(0,0,0,${Math.min(0.40, elapsed / 5000)})`; ctx.fillRect(BX, BY, BW, BH);
+    if (winVideo.readyState >= 2) drawMediaCover(winVideo, 0, 0, W, H);
+    ctx.fillStyle = `rgba(0,0,0,${Math.min(0.45, elapsed / 5000)})`; ctx.fillRect(0, 0, W, H);
 
     drawFireworks();
 
     if (elapsed > 600) {
-      const cx = BX + BW / 2, cy = BY + BH / 2;
+      const cx = W / 2, cy = H / 2;
       ctx.save(); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       text3D(ctx, '¡GANASTE!', cx, cy - 60, 'bold 52px monospace', '#ffe600', '#886600', 7);
       text3D(ctx, `Score: ${score}`, cx, cy, 'bold 30px monospace', '#ffffff', '#336600', 5);
@@ -168,12 +178,21 @@ function startWinAnim(score, _onRestart, onQuit) {
     winVideo.pause(); winVideo.currentTime = 0;
     winMusic.pause(); winMusic.currentTime = 0;
   }
+  function finishWin() {
+    stopWin();
+    document.removeEventListener('keydown', onKey);
+    document.removeEventListener('pointerdown', onPointer);
+    onQuit();
+  }
   function onKey(e) {
-    if (e.key === 'Escape') {
-      stopWin(); document.removeEventListener('keydown', onKey); onQuit();
-    }
+    if (e.key === 'Escape' || e.key === 'Enter') finishWin();
+  }
+  function onPointer(e) {
+    if (e.target.closest && e.target.closest('#touchControls')) return;
+    finishWin();
   }
   document.addEventListener('keydown', onKey);
+  document.addEventListener('pointerdown', onPointer);
   requestAnimationFrame(frame);
 }
 
@@ -376,11 +395,22 @@ function startGameOverAnim(board, score, stats, onRestart, onQuit) {
   }
 
   function stopVideo() { gameOverVideo.pause(); gameOverVideo.currentTime=0; defeatSong.pause(); defeatSong.currentTime=0; }
+  function finishGameOver() {
+    stopped = true;
+    stopVideo();
+    document.removeEventListener('keydown', onKey);
+    document.removeEventListener('pointerdown', onPointer);
+    onQuit();
+  }
 
   function onKey(e) {
-    if (e.key==='Enter'||e.key==='Escape') { stopped=true; stopVideo(); document.removeEventListener('keydown',onKey); onQuit(); }
+    if (e.key==='Enter'||e.key==='Escape') finishGameOver();
+  }
+  function onPointer(e) {
+    if (e.target.closest && e.target.closest('#touchControls')) return;
+    finishGameOver();
   }
   document.addEventListener('keydown',onKey);
+  document.addEventListener('pointerdown',onPointer);
   requestAnimationFrame(frame);
 }
-

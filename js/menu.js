@@ -1,7 +1,37 @@
 // ---- Fondo del menú ----
+let cachedMenuBg = null;
+let cachedCountdownBg = null;
+
+function makeMenuBgCache(kind) {
+  if (!menuImg.complete || !menuImg.naturalWidth) return null;
+  const off = document.createElement('canvas');
+  off.width = W; off.height = H;
+  const oc = off.getContext('2d');
+  oc.filter = kind === 'countdown'
+    ? 'brightness(0.65) saturate(1.5) contrast(1.05)'
+    : 'brightness(0.80) saturate(1.6) contrast(1.05)';
+  oc.drawImage(menuImg, 0, 0, W, H);
+  oc.filter = 'none';
+  if (kind === 'countdown') {
+    const vig = oc.createRadialGradient(W/2, H/2, H*0.05, W/2, H/2, H*0.75);
+    vig.addColorStop(0, 'rgba(0,0,0,0)');
+    vig.addColorStop(1, 'rgba(0,0,0,0.55)');
+    oc.fillStyle = vig; oc.fillRect(0, 0, W, H);
+  } else {
+    const vig = oc.createRadialGradient(W/2, H/2, H*0.2, W/2, H/2, H*0.95);
+    vig.addColorStop(0, 'rgba(0,0,0,0.15)');
+    vig.addColorStop(1, 'rgba(0,0,0,0.68)');
+    oc.fillStyle = vig; oc.fillRect(0, 0, W, H);
+    oc.fillStyle = 'rgba(0,0,10,0.38)'; oc.fillRect(0, 0, W, H);
+  }
+  return off;
+}
+
 function drawMenuBg() {
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
   if (menuImg.complete && menuImg.naturalWidth) {
+    if (!cachedMenuBg) cachedMenuBg = makeMenuBgCache('menu');
+    if (cachedMenuBg) { ctx.drawImage(cachedMenuBg, 0, 0); return; }
     ctx.save();
     ctx.filter = 'brightness(0.80) saturate(1.6) contrast(1.05)';
     ctx.drawImage(menuImg, 0, 0, W, H);
@@ -18,6 +48,8 @@ function drawMenuBg() {
 
 function drawCountdownBg() {
   if (menuImg.complete && menuImg.naturalWidth) {
+    if (!cachedCountdownBg) cachedCountdownBg = makeMenuBgCache('countdown');
+    if (cachedCountdownBg) { ctx.drawImage(cachedCountdownBg, 0, 0); return; }
     ctx.save();
     ctx.filter = 'brightness(0.65) saturate(1.5) contrast(1.05)';
     ctx.drawImage(menuImg, 0, 0, W, H);
@@ -664,7 +696,7 @@ function drawLeaderboard() {
   drawGoldTitle('RANKING', W/2, 62, 40, false);
   if (!leaderboardRefreshing) {
     leaderboardRefreshing = true;
-    fetchScoresFromSupabase().then(() => { leaderboardRefreshing = false; });
+    fetchScoresFromSupabase().finally(() => { leaderboardRefreshing = false; });
   }
   drawScoreTable(loadScores(), 108, 8);
   menuPulse += 0.04;
@@ -741,6 +773,8 @@ function stopIntroMusic() {
 function goToMenu(restartMusic=true) {
   inMenu=true; inNameEntry=false; inDifficulty=false; inLeaderboard=false; inCountdown=false; inCredits=false;
   menuUnlocked=true; menuPulse=0; menuOption=0; menuEnterTime=performance.now();
+  stopMusic();
+  stopLevelBgVideo();
   defeatSong.pause(); defeatSong.currentTime=0;
   if (restartMusic) { introMusic.currentTime=0; }
   introMusic.play().catch(()=>{});
@@ -753,4 +787,3 @@ function goBack() {
   if (inDifficulty)  { inDifficulty=false; inNameEntry=true; nameInput.style.display='block'; nameInput.focus(); return; }
   if (inNameEntry)   { nameInput.style.display='none'; nameInput.value=''; inNameEntry=false; inMenu=true; return; }
 }
-

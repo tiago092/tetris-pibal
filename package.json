@@ -1,0 +1,21 @@
+{
+  "name": "tetris-pibal",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Tetris Pibal web/mobile app.",
+  "scripts": {
+    "optimize-assets": "node scripts/optimize-assets.js",
+    "prepare-mobile": "node scripts/prepare-mobile.js",
+    "prepare-mobile:ps": "powershell -ExecutionPolicy Bypass -File scripts/prepare-mobile.ps1",
+    "cap:add:android": "npm run prepare-mobile && npx cap add android",
+    "cap:sync": "npm run prepare-mobile && npx cap sync android",
+    "android": "npm run cap:sync && npx cap open android"
+  },
+  "dependencies": {
+    "@capacitor/core": "6.2.1"
+  },
+  "devDependencies": {
+    "@capacitor/android": "6.2.1",
+    "@capacitor/cli": "6.2.1"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "name": "Tetris Pibal",
+  "short_name": "Tetris Pibal",
+  "description": "Tetris Pibal para web y moviles.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#0a0a16",
+  "theme_color": "#0a0a16",
+  "icons": [
+    {
+      "src": "assets/img/tonywarrior.webp",
+      "sizes": "192x192",
+      "type": "image/webp",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/img/tonywarrior.webp",
+      "sizes": "512x512",
+      "type": "image/webp",
+      "purpose": "any maskable"
+    }
+  ]
+}

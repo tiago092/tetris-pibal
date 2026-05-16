@@ -48,6 +48,8 @@ const nameInput = document.createElement('input');
 nameInput.type = 'text';
 nameInput.maxLength = 16;
 nameInput.placeholder = 'Tu nombre...';
+nameInput.autocomplete = 'off';
+nameInput.enterKeyHint = 'done';
 Object.assign(nameInput.style, {
   position:'absolute', left:'50%', top:'52%',
   transform:'translate(-50%,-50%)',
@@ -65,7 +67,8 @@ document.body.appendChild(nameInput);
 
 function resizeCanvas() {
   const scaleX = window.innerWidth  / W;
-  const scaleY = window.innerHeight / H;
+  const controlsReserve = document.body.classList.contains('touch-game-active') ? 150 : 0;
+  const scaleY = Math.max(0.2, (window.innerHeight - controlsReserve) / H);
   const scale  = Math.min(scaleX, scaleY);
   canvas.style.width  = Math.floor(W * scale) + 'px';
   canvas.style.height = Math.floor(H * scale) + 'px';
@@ -74,110 +77,248 @@ function resizeCanvas() {
   nameInput.style.top  = (rect.top  + rect.height * 0.565) + 'px';
 }
 window.addEventListener('resize', resizeCanvas);
+window.resizeGameCanvas = resizeCanvas;
 resizeCanvas();
+
+function unlockGameAudio() {
+  unlockAudio();
+  musicUnlocked = true;
+}
+
+function startMenuAudio() {
+  menuUnlocked = true;
+  menuEnterTime = performance.now();
+  unlockAudio();
+  stopMusic();
+  stopLevelBgVideo();
+  introMusic.play().catch(() => {});
+}
+
+function submitPlayerName() {
+  const n = nameInput.value.trim();
+  if (!n) return false;
+  playerName = n;
+  nameInput.style.display = 'none';
+  nameInput.value = '';
+  inNameEntry = false;
+  inDifficulty = true;
+  return true;
+}
+
+function selectMenuOption() {
+  if (menuOption === 0) {
+    inMenu = false; inNameEntry = true;
+    nameInput.style.display = 'block'; nameInput.focus();
+  } else if (menuOption === 1) {
+    inMenu = false; inLeaderboard = true; menuPulse = 0;
+  } else if (menuOption === 2) {
+    inMenu = false; inCredits = true; menuPulse = 0;
+    levelupSound.currentTime = 0; levelupSound.play().catch(() => {});
+  }
+}
+
+function startSelectedDifficulty() {
+  currentDiff = DIFFICULTIES[diffSelected];
+  inDifficulty = false; inCountdown = true;
+  countdownStart = performance.now(); countdownVal = 5;
+  stopIntroMusic();
+  state = createState();
+  unlockGameAudio();
+  checkMusic(state.level);
+}
+
+function pauseGame() {
+  if (!state || state.over || state.won) return;
+  state.paused = !state.paused;
+  if (state.paused) musicEl && musicEl.pause();
+  else musicEl && musicEl.play().catch(() => {});
+}
+
+function movePiece(dx) {
+  if (!state || state.paused || state.over || state.won) return;
+  const t = { ...state.piece, x: state.piece.x + dx };
+  if (valid(state.board, t)) state.piece = t;
+}
+
+function rotatePiece() {
+  if (!state || state.paused || state.over || state.won) return;
+  const t = { ...state.piece, rot: state.piece.rot + 1 };
+  if (valid(state.board, t)) { state.piece = t; playRotateSound(); }
+}
+
+function softDropPiece() {
+  if (!state || state.paused || state.over || state.won) return;
+  const t = { ...state.piece, y: state.piece.y + 1 };
+  if (valid(state.board, t)) { state.piece = t; state.lastFall = performance.now(); }
+}
+
+function hardDropPiece() {
+  if (!state || state.paused || state.over || state.won) return;
+  while (true) {
+    const t = { ...state.piece, y: state.piece.y + 1 };
+    if (valid(state.board, t)) state.piece = t;
+    else break;
+  }
+  playHardDropSound();
+  doLock();
+}
+
+function handleGameTap(x, y) {
+  if (inMenu) {
+    if (!menuUnlocked) { startMenuAudio(); return; }
+    for (let i = 0; i < MENU_OPTIONS.length; i++) {
+      const cy = H * 0.47 + i * 62;
+      if (Math.abs(y - cy) <= 30) {
+        menuOption = i;
+        selectMenuOption();
+        return;
+      }
+    }
+    return;
+  }
+  if (inNameEntry) { nameInput.focus(); return; }
+  if (inDifficulty) {
+    for (let i = 0; i < DIFFICULTIES.length; i++) {
+      const cy = H * 0.46 + i * 62;
+      if (Math.abs(y - cy) <= 30) {
+        if (diffSelected === i) startSelectedDifficulty();
+        else { diffSelected = i; playMenuTick(); }
+        return;
+      }
+    }
+    return;
+  }
+  if (inLeaderboard || inCredits) { goBack(); return; }
+  if (!inCountdown) rotatePiece();
+}
+
+function handleGameAction(action) {
+  const type = typeof action === 'string' ? action : action && action.type;
+  if (!type) return;
+
+  if (type === 'unlock' || type === 'start') {
+    if (inMenu) startMenuAudio();
+    else {
+      unlockGameAudio();
+      if (state && !state.over && !state.won) checkMusic(state.level);
+    }
+    return;
+  }
+  if (type === 'mute') { toggleMute(); return; }
+  if (type === 'back') { goBack(); return; }
+  if (type === 'tap') { handleGameTap(action.x, action.y); return; }
+
+  if (inMenu) {
+    if (!menuUnlocked) { startMenuAudio(); return; }
+    if (type === 'up') { menuOption = (menuOption - 1 + MENU_OPTIONS.length) % MENU_OPTIONS.length; playMenuTick(); return; }
+    if (type === 'down') { menuOption = (menuOption + 1) % MENU_OPTIONS.length; playMenuTick(); return; }
+    if (type === 'confirm') { selectMenuOption(); return; }
+    return;
+  }
+
+  if (inNameEntry) {
+    if (type === 'confirm') submitPlayerName();
+    return;
+  }
+
+  if (inDifficulty) {
+    if (type === 'up' || type === 'left') {
+      diffSelected = (diffSelected - 1 + DIFFICULTIES.length) % DIFFICULTIES.length;
+      playMenuTick();
+    } else if (type === 'down' || type === 'right') {
+      diffSelected = (diffSelected + 1) % DIFFICULTIES.length;
+      playMenuTick();
+    } else if (type === 'confirm') {
+      startSelectedDifficulty();
+    }
+    return;
+  }
+
+  if (inLeaderboard || inCredits) {
+    if (type === 'confirm') goBack();
+    return;
+  }
+
+  if (!musicUnlocked) { unlockGameAudio(); checkMusic(state.level); }
+  if (type === 'pause') { pauseGame(); return; }
+  if (type === 'levelSkip') { state.lines = ((state.level + 1) * 15); doLock(); return; }
+  if (state.paused || state.over || state.won) return;
+  if (type === 'left') movePiece(-1);
+  else if (type === 'right') movePiece(1);
+  else if (type === 'rotate' || type === 'up') rotatePiece();
+  else if (type === 'softDrop') softDropPiece();
+  else if (type === 'hardDrop') hardDropPiece();
+}
+
+window.handleGameAction = handleGameAction;
+window.getGameUiState = function getGameUiState() {
+  return {
+    inMenu, inNameEntry, inDifficulty, inLeaderboard, inCredits, inCountdown,
+    inGame: !inMenu && !inNameEntry && !inDifficulty && !inLeaderboard && !inCredits && !inCountdown,
+    menuUnlocked,
+    paused: !!(state && state.paused),
+    over: !!(state && state.over),
+    won: !!(state && state.won),
+  };
+};
 
 // ---- Input: nombre ----
 nameInput.addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     e.preventDefault();
     e.stopPropagation();
-    const n = nameInput.value.trim();
-    if (!n) return;
-    playerName = n;
-    nameInput.style.display = 'none';
-    nameInput.value = '';
-    inNameEntry = false;
-    inDifficulty = true;
+    submitPlayerName();
   } else if (e.key === 'Escape') {
     e.preventDefault();
     e.stopPropagation();
-    goBack();
+    handleGameAction('back');
   }
 });
 
 // ---- Input: teclado ----
 document.addEventListener('keydown', e => {
-  if ((e.key === 'm' || e.key === 'M') && document.activeElement !== nameInput) { toggleMute(); return; }
-
-  if (inMenu) {
-    if (!menuUnlocked) {
-      menuUnlocked = true;
-      menuEnterTime = performance.now();
-      unlockAudio();
-      introMusic.play().catch(() => {});
-      return;
-    }
-    if (e.key === 'ArrowUp')   { menuOption = (menuOption - 1 + MENU_OPTIONS.length) % MENU_OPTIONS.length; playMenuTick(); return; }
-    if (e.key === 'ArrowDown') { menuOption = (menuOption + 1) % MENU_OPTIONS.length; playMenuTick(); return; }
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      if (menuOption === 0) {
-        inMenu = false; inNameEntry = true;
-        nameInput.style.display = 'block'; nameInput.focus();
-      } else if (menuOption === 1) {
-        inMenu = false; inLeaderboard = true; menuPulse = 0;
-      } else if (menuOption === 2) {
-        inMenu = false; inCredits = true; menuPulse = 0;
-        levelupSound.currentTime = 0; levelupSound.play().catch(() => {});
-      }
-    }
-    return;
-  }
-
   if (inNameEntry) return;
-
-  if (inDifficulty) {
-    if (e.key==='Escape') { e.preventDefault(); goBack(); return; }
-    if (e.key==='ArrowUp'||e.key==='ArrowLeft')
-      { diffSelected = (diffSelected - 1 + DIFFICULTIES.length) % DIFFICULTIES.length; playMenuTick(); }
-    else if (e.key==='ArrowDown'||e.key==='ArrowRight')
-      { diffSelected = (diffSelected + 1) % DIFFICULTIES.length; playMenuTick(); }
-    else if (e.key==='Enter') {
-      e.preventDefault();
-      currentDiff = DIFFICULTIES[diffSelected];
-      inDifficulty = false; inCountdown = true;
-      countdownStart = performance.now(); countdownVal = 5;
-      stopIntroMusic();
-      state = createState();
-      musicUnlocked = true;
-      checkMusic(state.level);
-    }
-    return;
-  }
-
-  if (inLeaderboard) {
-    if (e.key==='Enter'||e.key==='Escape') { e.preventDefault(); goBack(); }
-    return;
-  }
-  if (inCredits) {
-    if (e.key==='Enter'||e.key==='Escape') { e.preventDefault(); goBack(); }
-    return;
-  }
-
-  if (!musicUnlocked) { musicUnlocked=true; unlockAudio(); checkMusic(state.level); }
-  if (state.over || state.won) return;
-  if (e.key==='p'||e.key==='P') {
-    state.paused=!state.paused;
-    if (state.paused) musicEl&&musicEl.pause();
-    else musicEl&&musicEl.play().catch(()=>{});
-    return;
-  }
-  if (state.paused) return;
-  if (e.key==='n'||e.key==='N') { state.lines=((state.level+1)*15); doLock(); return; }
-  if (e.key==='ArrowLeft')  { const t={...state.piece,x:state.piece.x-1}; if(valid(state.board,t))state.piece=t; }
-  else if (e.key==='ArrowRight') { const t={...state.piece,x:state.piece.x+1}; if(valid(state.board,t))state.piece=t; }
-  else if (e.key==='ArrowUp')   { const t={...state.piece,rot:state.piece.rot+1}; if(valid(state.board,t)){state.piece=t; playRotateSound();} }
-  else if (e.key==='ArrowDown') { const t={...state.piece,y:state.piece.y+1}; if(valid(state.board,t)){state.piece=t;state.lastFall=performance.now();} }
-  else if (e.key===' ') {
+  if ((e.key === 'm' || e.key === 'M') && document.activeElement !== nameInput) { handleGameAction('mute'); return; }
+  if (e.key === 'ArrowUp') { handleGameAction('up'); return; }
+  if (e.key === 'ArrowDown') { handleGameAction(inMenu || inDifficulty ? 'down' : 'softDrop'); return; }
+  if (e.key === 'ArrowLeft') { handleGameAction('left'); return; }
+  if (e.key === 'ArrowRight') { handleGameAction('right'); return; }
+  if (e.key === 'Enter') { e.preventDefault(); handleGameAction('confirm'); return; }
+  if (e.key === 'Escape') { e.preventDefault(); handleGameAction('back'); return; }
+  if (e.key === 'p' || e.key === 'P') { handleGameAction('pause'); return; }
+  if (e.key === 'n' || e.key === 'N') { handleGameAction('levelSkip'); return; }
+  if (e.key === ' ') {
     e.preventDefault();
-    while(true){const t={...state.piece,y:state.piece.y+1};if(valid(state.board,t))state.piece=t;else break;}
-    playHardDropSound();
-    doLock();
+    handleGameAction('hardDrop');
   }
 });
 
+window.addEventListener('pointerdown', () => {
+  if (!audioCtx) unlockAudio();
+}, { passive: true });
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) {
+    if (state && !state.over && !state.won && !state.paused && !inMenu && !inNameEntry && !inDifficulty && !inLeaderboard && !inCredits && !inCountdown) {
+      state.paused = true;
+    }
+    if (musicEl) musicEl.pause();
+    introMusic.pause();
+    levelBgAudio.pause();
+    defeatSong.pause();
+    winMusic.pause();
+  } else {
+    if (inMenu && menuUnlocked) introMusic.play().catch(() => {});
+  }
+});
+
+if (window.installTouchControls) {
+  window.installTouchControls({ canvas, dispatch: handleGameAction });
+}
+
 // ---- Game loop ----
 let lastTime = performance.now();
+let lastMediaEnsure = 0;
 function loop(now) {
   const dt=now-lastTime; lastTime=now;
 
@@ -218,6 +359,14 @@ function loop(now) {
     return;
   }
   if (!state.paused) {
+    if (now - lastMediaEnsure > 1500) {
+      lastMediaEnsure = now;
+      if (musicUnlocked) checkMusic(state.level);
+      const theme = getTheme(state.level);
+      if (theme.bg.type === 'video' && levelBgVideo.paused && currentLevelBgSrc) {
+        levelBgVideo.play().catch(() => {});
+      }
+    }
     if (state.clearingRows) {
       const age = now - state.clearingRows.startTime;
       if (age >= 300) finishLineClear();
