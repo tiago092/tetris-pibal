@@ -60,7 +60,7 @@ const LEVELS = [
     blockStyle: 'neon',
     opacity: 0.40,
     tint:    'rgba(20,0,50,0.20)',
-    music:   'assets/sound/rapdelavilla.mp3',
+    music:   'assets/sound/cacho.mp3',
     border:  ['#3a1a6a', '#9a50ff'],
     grid:    'rgba(180,100,255,0.07)',
     hud:     { label:'#b878ff', value:'#e0b0ff', panel:'rgba(30,0,60,0.55)', border:'#7030c0', title:'#cc88ff' },

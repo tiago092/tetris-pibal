@@ -179,14 +179,9 @@ function startWinAnim(score, _onRestart, onQuit) {
 
 // ---- Animación de muerte (antes del game over) ----
 function startDeathAnim(board, onDone) {
-  // El congelado baja de arriba hacia abajo.
-  // El desmoronamiento empieza abajo mientras el hielo todavía baja — las fases se solapan.
-  const FREEZE_MS       = 4500;
-  const CRUMBLE_START   = FREEZE_MS * 0.72;  // el desmoronamiento arranca aquí (ms absolutos)
-  const CRUMBLE_MS      = 1800;
-  const FADE_MS         = 450;
-  const TOTAL_MS        = CRUMBLE_START + CRUMBLE_MS + FADE_MS;
-  const GRAVITY         = 0.00020;  // px/ms²
+  const FREEZE_MS = 3500;
+  const FADE_MS   = 600;
+  const TOTAL_MS  = FREEZE_MS + FADE_MS;
 
   const start = performance.now();
   deathSound.currentTime = 0; deathSound.play().catch(() => {});
@@ -195,58 +190,25 @@ function startDeathAnim(board, onDone) {
   const snapshot = board.map(row => [...row]);
   const theme = getTheme(state.level);
 
-  // Pre-generar fragmentos por bloque (6 trozos: grilla 3x2 para más detalle)
-  const FRAG_COLS = 3, FRAG_ROWS = 2;
-  const fW = CS / FRAG_COLS, fH = CS / FRAG_ROWS;
   const cells = [];
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      if (!snapshot[r][c]) continue;
-      const crumbleDelay = ((ROWS - 1 - r) / ROWS) * 0.60;
-      const seed = r * 17 + c * 31;
-      const frags = [];
-      for (let fi = 0; fi < FRAG_COLS * FRAG_ROWS; fi++) {
-        const fcol = fi % FRAG_COLS, frow = Math.floor(fi / FRAG_COLS);
-        const s = seed + fi * 13;
-        const localCx = fcol * fW + fW / 2;
-        const localCy = frow * fH + fH / 2;
-        const dx = localCx - CS / 2, dy = localCy - CS / 2;
-        const len = Math.sqrt(dx * dx + dy * dy) || 1;
-        const spread = 0.7 + (s % 30) / 100;
-        const speed = 55 + (s % 50);
-        frags.push({
-          ox: BX + c * CS + fcol * fW,
-          oy: BY + r * CS + frow * fH,
-          vx: (dx / len) * spread * speed * 0.001,
-          vy: (dy / len) * spread * speed * 0.001 - 0.055,
-          rot: ((s % 24) - 12) * 0.004,
-          w: fW - 1, h: fH - 1,
-        });
-      }
-      cells.push({ r, c, color: snapshot[r][c], crumbleDelay, frags });
-    }
-  }
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      if (snapshot[r][c]) cells.push({ r, c, color: snapshot[r][c] });
 
   function frame(now) {
     const elapsed = now - start;
-    const t = Math.min(1, elapsed / TOTAL_MS);
-
-    // freezeT: 0→1 durante FREEZE_MS (sigue corriendo aunque empiece el crumble)
+    const t       = Math.min(1, elapsed / TOTAL_MS);
     const freezeT = Math.min(1, elapsed / FREEZE_MS);
-
-    // crumbleElapsed: tiempo desde que arrancó el crumble (puede ser 0 si todavía no)
-    const crumbleElapsed = Math.max(0, elapsed - CRUMBLE_START);
-    const crumbleT = Math.min(1, crumbleElapsed / CRUMBLE_MS);
 
     ctx.fillStyle = '#0c0c16';
     ctx.fillRect(0, 0, W, H);
 
-    // shake inicial
-    const shakeAmt = Math.max(0, (0.12 - freezeT) / 0.12) * 7;
+    // shake inicial breve
+    const shakeAmt = Math.max(0, (0.10 - freezeT) / 0.10) * 6;
     ctx.save();
     ctx.translate((Math.random()*2-1)*shakeAmt, (Math.random()*2-1)*shakeAmt);
 
-    // panel exterior del tablero
+    // panel exterior
     { const px=BX-10, py=BY-10, pw=BW+20, ph=BH+20, pr=10;
       ctx.save();
       ctx.shadowColor='rgba(0,0,0,0.7)'; ctx.shadowBlur=18;
@@ -270,75 +232,39 @@ function startDeathAnim(board, onDone) {
     }
     ctx.restore();
 
-    // renderizar cada celda: puede estar en fase freeze, crumble, o ambas a la vez
-    for (const cell of cells) {
-      const { r, c, color, crumbleDelay, frags } = cell;
-
-      // progreso de congelado de esta celda
+    // bloques con overlay de hielo progresivo de arriba hacia abajo
+    for (const { r, c, color } of cells) {
+      drawBlock3D(ctx, color, BX + c * CS, BY + r * CS);
       const rowDelay = (r / ROWS) * 0.85;
-      const blockT = Math.max(0, Math.min(1, (freezeT - rowDelay) / (1 - rowDelay)));
-      const colVar = ((c * 7 + r * 3) % 10) / 10 * 0.15;
-      const cellFreezeT = Math.min(1, blockT + colVar);
-
-      // progreso de desmoronamiento de esta celda
-      const cellCrumbleT = crumbleT > 0
-        ? Math.min(1, Math.max(0, crumbleT - crumbleDelay) / (1 - crumbleDelay + 0.001))
-        : 0;
-
-      if (cellCrumbleT === 0) {
-        // ---- todavía entero: dibujar bloque con overlay de hielo ----
-        drawBlock3D(ctx, color, BX + c * CS, BY + r * CS);
-        if (cellFreezeT > 0) {
-          ctx.fillStyle = `rgba(180,220,255,${cellFreezeT * 0.50})`;
-          ctx.fillRect(BX + c * CS, BY + r * CS, CS, CS);
-          if (cellFreezeT > 0.4) {
-            ctx.fillStyle = `rgba(255,255,255,${(cellFreezeT - 0.4) / 0.6 * 0.85})`;
-            ctx.fillRect(BX + c * CS + 2, BY + r * CS + 2, CS - 4, 3);
-          }
-          if (cellFreezeT > 0.5 && cellFreezeT < 0.95) {
-            const sparkA = Math.sin((cellFreezeT - 0.5) / 0.45 * Math.PI) * 0.7;
-            ctx.fillStyle = `rgba(200,240,255,${sparkA})`;
-            ctx.fillRect(BX + c * CS + CS * 0.2, BY + r * CS + CS * 0.3, 3, 3);
-            ctx.fillRect(BX + c * CS + CS * 0.65, BY + r * CS + CS * 0.6, 2, 2);
-            ctx.fillRect(BX + c * CS + CS * 0.8, BY + r * CS + CS * 0.2, 2, 3);
-          }
+      const blockT   = Math.max(0, Math.min(1, (freezeT - rowDelay) / (1 - rowDelay)));
+      const colVar   = ((c * 7 + r * 3) % 10) / 10 * 0.15;
+      const cellT    = Math.min(1, blockT + colVar);
+      if (cellT > 0) {
+        ctx.fillStyle = `rgba(180,220,255,${cellT * 0.52})`;
+        ctx.fillRect(BX + c * CS, BY + r * CS, CS, CS);
+        if (cellT > 0.4) {
+          ctx.fillStyle = `rgba(255,255,255,${(cellT - 0.4) / 0.6 * 0.85})`;
+          ctx.fillRect(BX + c * CS + 2, BY + r * CS + 2, CS - 4, 3);
         }
-      } else {
-        // ---- desmoronándose: fragmentos con física ----
-        const alpha = Math.max(0, 1 - cellCrumbleT * 1.15);
-        const dt = crumbleElapsed - crumbleDelay * CRUMBLE_MS;
-        if (dt <= 0 || alpha <= 0) continue;
-
-        for (const fg of frags) {
-          const px = fg.ox + fg.vx * dt;
-          const py = fg.oy + fg.vy * dt + 0.5 * GRAVITY * dt * dt;
-          const angle = fg.rot * dt;
-          ctx.save();
-          ctx.globalAlpha = alpha;
-          ctx.translate(px + fg.w / 2, py + fg.h / 2);
-          ctx.rotate(angle);
-          ctx.fillStyle = color;
-          ctx.fillRect(-fg.w / 2, -fg.h / 2, fg.w, fg.h);
-          ctx.fillStyle = `rgba(180,220,255,0.55)`;
-          ctx.fillRect(-fg.w / 2, -fg.h / 2, fg.w, fg.h);
-          ctx.fillStyle = `rgba(255,255,255,0.5)`;
-          ctx.fillRect(-fg.w / 2, -fg.h / 2, fg.w, 2);
-          ctx.restore();
+        if (cellT > 0.5 && cellT < 0.95) {
+          const sparkA = Math.sin((cellT - 0.5) / 0.45 * Math.PI) * 0.7;
+          ctx.fillStyle = `rgba(200,240,255,${sparkA})`;
+          ctx.fillRect(BX + c * CS + CS * 0.2, BY + r * CS + CS * 0.3, 3, 3);
+          ctx.fillRect(BX + c * CS + CS * 0.65, BY + r * CS + CS * 0.6, 2, 2);
+          ctx.fillRect(BX + c * CS + CS * 0.8, BY + r * CS + CS * 0.2, 2, 3);
         }
       }
     }
 
-    // overlay azul global que crece durante el freeze y se disipa al crumble
-    const globalIce = Math.max(0, Math.min(0.25,
-      Math.max(0, freezeT - 0.5) / 0.5 * 0.25 * (1 - crumbleT * 1.5)
-    ));
+    // overlay azul global suave al completarse el freeze
+    const globalIce = Math.max(0, freezeT - 0.6) / 0.4 * 0.20;
     if (globalIce > 0) {
       ctx.fillStyle = `rgba(100,160,255,${globalIce})`;
       ctx.fillRect(BX, BY, BW, BH);
     }
 
     // fade a negro al final
-    const fadeAlpha = Math.max(0, (elapsed - CRUMBLE_START - CRUMBLE_MS) / FADE_MS);
+    const fadeAlpha = Math.max(0, (elapsed - FREEZE_MS) / FADE_MS);
     if (fadeAlpha > 0) {
       ctx.fillStyle = `rgba(0,0,0,${fadeAlpha})`;
       ctx.fillRect(0, 0, W, H);
@@ -346,11 +272,7 @@ function startDeathAnim(board, onDone) {
 
     ctx.restore();
 
-    if (t < 1) {
-      requestAnimationFrame(frame);
-    } else {
-      onDone();
-    }
+    if (t < 1) { requestAnimationFrame(frame); } else { onDone(); }
   }
   requestAnimationFrame(frame);
 }
