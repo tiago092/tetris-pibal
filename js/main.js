@@ -1,3 +1,8 @@
+// ---- Detección móvil ----
+if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) || ('ontouchstart' in window)) {
+  document.body.classList.add('is-mobile');
+}
+
 // ---- Estado global de flujo ----
 let inMenu       = true;
 let inNameEntry  = false;
@@ -192,9 +197,9 @@ function bindMobileBtn(id, action) {
   if (!btn) return;
   let interval = null;
   const start = () => {
+    unlockAudio();
     if (!mobileGameActive()) {
-      // en menús: cualquier tap actúa como Enter
-      if (inMenu && !menuUnlocked) { menuUnlocked=true; menuEnterTime=performance.now(); unlockAudio(); introMusic.play().catch(()=>{}); return; }
+      if (inMenu && !menuUnlocked) { menuUnlocked=true; menuEnterTime=performance.now(); introMusic.play().catch(()=>{}); }
       return;
     }
     action();
@@ -218,9 +223,10 @@ bindMobileBtn('btn-drop',   mobileDrop);
 // tap en canvas para desbloquear audio/menú en móvil
 canvas.addEventListener('touchstart', e => {
   e.preventDefault();
+  unlockAudio();
   if (inMenu && !menuUnlocked) {
     menuUnlocked = true; menuEnterTime = performance.now();
-    unlockAudio(); introMusic.play().catch(() => {});
+    introMusic.play().catch(() => {});
   }
 }, { passive: false });
 

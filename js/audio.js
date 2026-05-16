@@ -9,6 +9,18 @@ let musicMuted = false;
 function unlockAudio() {
   if (audioCtx) return;
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  // iOS/Android requieren reproducir un audio real en el primer gesto para desbloquearlo
+  const silent = new Audio();
+  silent.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+  silent.volume = 0;
+  silent.play().catch(() => {});
+
+  // forzar reproducción de introMusic si ya estaba pendiente
+  if (introMusic.paused && introMusic.src) {
+    introMusic.play().catch(() => {});
+  }
 }
 
 function makeLandSound() {
