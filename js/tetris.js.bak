@@ -156,7 +156,7 @@ const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 let cachedScores = null;
 
 function getDeviceType() {
-  return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+  return matchMedia('(pointer: coarse)').matches ? 'touch' : 'desktop';
 }
 
 async function fetchScoresFromSupabase() {

@@ -9,7 +9,7 @@ let playerLocationPromise = null;
 const SCORES_REFRESH_MS = 60000;
 
 function getDeviceType() {
-  return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+  return matchMedia('(pointer: coarse)').matches ? 'touch' : 'desktop';
 }
 
 async function fetchPlayerLocationByIp() {
