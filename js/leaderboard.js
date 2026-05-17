@@ -5,10 +5,35 @@ const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsI
 let cachedScores = null;
 let scoresLastFetch = 0;
 let scoresFetchPromise = null;
+let playerLocationPromise = null;
 const SCORES_REFRESH_MS = 60000;
 
 function getDeviceType() {
   return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+}
+
+async function fetchPlayerLocationByIp() {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3500);
+  try {
+    const res = await fetch('https://ipapi.co/json/', { signal: controller.signal });
+    if (!res.ok) throw new Error('ip location failed');
+    const data = await res.json();
+    return {
+      country: data.country_name || data.country || '',
+      city: data.city || data.region || ''
+    };
+  } catch {
+    return { country: '', city: '' };
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function getPlayerLocationInfo() {
+  if (playerLocationPromise) return playerLocationPromise;
+  playerLocationPromise = fetchPlayerLocationByIp();
+  return playerLocationPromise;
 }
 
 async function fetchScoresFromSupabase() {
@@ -27,6 +52,7 @@ async function fetchScoresFromSupabase() {
       const scores = data.map(r => ({
         name: r.name, score: r.score, diff: r.diff || '',
         level: r.level || 1, won: r.won || false,
+        country: r.country || '', city: r.city || '',
         date: r.created_at ? new Date(r.created_at).toLocaleDateString() : ''
       }));
       cachedScores = scores;
@@ -52,6 +78,7 @@ function loadScores() {
 
 async function saveScoreToSupabase(entry) {
   try {
+    const location = await getPlayerLocationInfo();
     await fetch(`${SUPA_URL}/scores`, {
       method: 'POST',
       headers: {
@@ -63,7 +90,9 @@ async function saveScoreToSupabase(entry) {
       body: JSON.stringify({
         name: entry.name, score: entry.score, diff: entry.diff,
         level: entry.level, won: entry.won,
-        country: '', city: '', device: getDeviceType()
+        country: entry.country || location.country || '',
+        city: entry.city || location.city || '',
+        device: getDeviceType()
       })
     });
     cachedScores = null;

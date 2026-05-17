@@ -6,7 +6,7 @@
 
 // ---- Menú principal ----
 const MENU_CONFIG = {
-  bg:    'assets/img/achitiago.png',
+  bg:    'assets/img/achitiago-pixel.png',
   music: 'assets/sound/intro.mp3',
 };
 

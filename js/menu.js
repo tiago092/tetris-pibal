@@ -1,6 +1,8 @@
 // ---- Fondo del menú ----
 let cachedMenuBg = null;
 let cachedCountdownBg = null;
+const NEON_UI_SATURATION = 0.7;
+const NAME_ENTRY_NEON_SATURATION = 0.5;
 
 function makeMenuBgCache(kind) {
   if (!menuImg.complete || !menuImg.naturalWidth) return null;
@@ -9,7 +11,7 @@ function makeMenuBgCache(kind) {
   const oc = off.getContext('2d');
   oc.filter = kind === 'countdown'
     ? 'brightness(0.65) saturate(1.5) contrast(1.05)'
-    : 'brightness(0.80) saturate(1.6) contrast(1.05)';
+    : 'brightness(0.80) saturate(0.80) contrast(0.80)';
   oc.drawImage(menuImg, 0, 0, W, H);
   oc.filter = 'none';
   if (kind === 'countdown') {
@@ -33,7 +35,7 @@ function drawMenuBg() {
     if (!cachedMenuBg) cachedMenuBg = makeMenuBgCache('menu');
     if (cachedMenuBg) { ctx.drawImage(cachedMenuBg, 0, 0); return; }
     ctx.save();
-    ctx.filter = 'brightness(0.80) saturate(1.6) contrast(1.05)';
+    ctx.filter = 'brightness(0.80) saturate(0.80) contrast(0.80)';
     ctx.drawImage(menuImg, 0, 0, W, H);
     ctx.filter = 'none';
     ctx.restore();
@@ -62,69 +64,86 @@ function drawCountdownBg() {
   }
 }
 function drawBrickTitle(text, x, y, fontSize=52, bold=true) {
-  const font = `${bold?'bold ':''}${fontSize}px monospace`;
+  const font = `${bold?'800 ':'650 '}${fontSize}px Arial Black, Impact, sans-serif`;
   ctx.save();
+  ctx.filter = `saturate(${NEON_UI_SATURATION})`;
   ctx.font = font;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'middle';
 
   // medir ancho total para centrar
-  const letters = text.split('').filter(c => c !== ' ');
-  const spacing = fontSize * 0.06; // kerning extra
-  const widths = text.split('').map(c => ctx.measureText(c).width + spacing);
+  const chars = text.split('');
+  const spacing = fontSize * 0.045;
+  const spaceW = fontSize * 0.62;
+  const widths = chars.map(c => c === ' ' ? spaceW : ctx.measureText(c).width + spacing);
   const totalW = widths.reduce((a, b) => a + b, 0);
   let cx = x - totalW / 2;
+  let colorCount = 0;
 
-  text.split('').forEach((ch, i) => {
+  chars.forEach((ch, i) => {
     const lw = widths[i];
     const lx = cx + lw / 2;
-    const colorIdx = letters.indexOf(ch) >= 0
-      ? (text.split('').filter((c,j) => c !== ' ' && j <= i).length - 1) % TETRIS_LETTER_COLORS.length
-      : 0;
-    const col = TETRIS_LETTER_COLORS[colorIdx % TETRIS_LETTER_COLORS.length];
 
     if (ch === ' ') { cx += lw; return; }
+
+    const col = TETRIS_LETTER_COLORS[colorCount % TETRIS_LETTER_COLORS.length];
+    colorCount++;
 
     ctx.save();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.font = font;
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
 
-    // sombra 3D abajo-derecha (reducida)
+    // sombra 3D abajo-derecha
     for (let s = 5; s > 0; s--) {
-      ctx.fillStyle = `rgba(0,0,0,${0.45 - s * 0.06})`;
-      ctx.fillText(ch, lx + s, y + s);
+      ctx.fillStyle = `rgba(0,0,0,${0.34 - s * 0.04})`;
+      ctx.fillText(ch, lx + s * 0.5, y + s * 0.45);
     }
 
-    // contorno fino
-    ctx.strokeStyle = 'rgba(0,0,0,0.85)';
-    ctx.lineWidth = 4;
-    ctx.lineJoin = 'round';
+    // halo exterior y tubo de neon grueso
+    ctx.shadowColor = col.top;
+    ctx.shadowBlur = fontSize * 0.18;
+    ctx.strokeStyle = col.mid;
+    ctx.lineWidth = Math.max(6, fontSize * 0.11);
+    ctx.strokeText(ch, lx, y);
+    ctx.shadowBlur = fontSize * 0.10;
+    ctx.strokeStyle = col.top;
+    ctx.lineWidth = Math.max(3, fontSize * 0.065);
+    ctx.strokeText(ch, lx, y);
+
+    // contorno negro que separa cada letra del brillo
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(0,0,0,0.95)';
+    ctx.lineWidth = Math.max(2, fontSize * 0.04);
     ctx.strokeText(ch, lx, y);
 
     // relleno principal con gradiente vertical
     const th = fontSize;
     const grad = ctx.createLinearGradient(lx, y - th/2, lx, y + th/2);
-    grad.addColorStop(0.0, col.top);
-    grad.addColorStop(0.45, col.mid);
-    grad.addColorStop(1.0, col.bot);
-    // glow del color de la letra (dos pasadas: difuso + apretado)
-    ctx.shadowColor = col.top; ctx.shadowBlur = 28;
+    grad.addColorStop(0.00, 'rgba(255,255,255,0.82)');
+    grad.addColorStop(0.08, col.top);
+    grad.addColorStop(0.48, col.mid);
+    grad.addColorStop(0.52, col.bot);
+    grad.addColorStop(1.00, col.top);
+    // glow del color de la letra
+    ctx.shadowColor = col.top; ctx.shadowBlur = fontSize * 0.055;
     ctx.fillStyle = grad; ctx.fillText(ch, lx, y);
-    ctx.shadowBlur = 12;
-    ctx.fillText(ch, lx, y);
     ctx.shadowBlur = 0;
-    ctx.fillText(ch, lx, y);
 
-    // borde lateral derecho más oscuro (efecto volumen)
-    ctx.strokeStyle = col.bot;
-    ctx.lineWidth = 2;
+    // surco interior para que lea como letra hueca/tubo
+    ctx.strokeStyle = 'rgba(255,255,255,0.58)';
+    ctx.lineWidth = Math.max(1, fontSize * 0.022);
+    ctx.strokeText(ch, lx - 1, y - 1);
+    ctx.strokeStyle = 'rgba(0,0,0,0.36)';
+    ctx.lineWidth = Math.max(1, fontSize * 0.018);
     ctx.strokeText(ch, lx + 1, y + 1);
 
     // gloss: reflejo blanco en la parte superior (~40% de la altura)
     const gloss = ctx.createLinearGradient(lx, y - th/2, lx, y - th/2 + th * 0.42);
-    gloss.addColorStop(0,   'rgba(255,255,255,0.90)');
-    gloss.addColorStop(0.5, 'rgba(255,255,255,0.40)');
+    gloss.addColorStop(0,   'rgba(255,255,255,0.58)');
+    gloss.addColorStop(0.42,'rgba(255,255,255,0.18)');
     gloss.addColorStop(1,   'rgba(255,255,255,0)');
     ctx.fillStyle = gloss;
     ctx.fillText(ch, lx, y);
@@ -392,40 +411,17 @@ function drawSideFrames(alpha) {
   ctx.restore();
 }
 
-function drawTitleBox(y, fontSize, alpha=1) {
-  const tbW = 460, tbH = fontSize * 1.65, tbX = W/2 - tbW/2, tbY = y - tbH/2 - 2;
-  ctx.save();
-  ctx.globalAlpha = alpha * 0.88;
-  const tbGrad = ctx.createLinearGradient(tbX, tbY, tbX, tbY + tbH);
-  tbGrad.addColorStop(0,   'rgba(45,47,52,0.88)');
-  tbGrad.addColorStop(0.5, 'rgba(60,62,68,0.84)');
-  tbGrad.addColorStop(1,   'rgba(45,47,52,0.88)');
-  ctx.fillStyle = tbGrad;
-  ctx.beginPath(); ctx.roundRect(tbX, tbY, tbW, tbH, 8); ctx.fill();
-  // borde gris claro
-  const tbBorder = ctx.createLinearGradient(tbX, tbY, tbX + tbW, tbY);
-  tbBorder.addColorStop(0,   'rgba(180,180,190,0.30)');
-  tbBorder.addColorStop(0.3, 'rgba(220,220,230,0.80)');
-  tbBorder.addColorStop(0.7, 'rgba(220,220,230,0.80)');
-  tbBorder.addColorStop(1,   'rgba(180,180,190,0.30)');
-  ctx.strokeStyle = tbBorder; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.roundRect(tbX, tbY, tbW, tbH, 8); ctx.stroke();
-  ctx.strokeStyle = 'rgba(255,255,255,0.10)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.roundRect(tbX + 3, tbY + 3, tbW - 6, tbH - 6, 6); ctx.stroke();
-  ctx.restore();
-}
 function drawMenu(now) {
   drawMenuBg();
 
   if (!menuUnlocked) {
     // título estático antes de desbloquear
-    drawTitleBox(110, 52);
-    drawBrickTitle('TETRIS PIBAL', W/2, 110, 52);
+    drawRankingTitle('TETRIS PIBAL', W/2, 110, 44);
     menuPulse += 0.04;
     const a = 0.55 + 0.45 * Math.sin(menuPulse);
     ctx.save();
     ctx.globalAlpha = a;
-    drawGlowText('PRESIONA TECLA CUALQUIERA', W/2, H/2, 'bold 24px monospace', '#e0e8ff', 'rgba(100,140,255,0.8)', 20);
+    drawGlowText('PRESIONA ENTER', W/2, H/2, 'bold 24px monospace', '#e0e8ff', 'rgba(100,140,255,0.8)', 20);
     ctx.restore();
     return;
   }
@@ -436,11 +432,7 @@ function drawMenu(now) {
   const titleT  = Math.min(1, age / ANIM_DUR);
   const titleY  = -80 + (110 + 80) * easeOutBounce(titleT);  // cae desde arriba
 
-  drawTitleBox(titleY, 52, titleT);
-  drawBrickTitle('TETRIS PIBAL', W/2, titleY, 52);
-
-  // marcos laterales de madera
-  drawSideFrames(Math.min(1, (age - 100) / 600));
+  drawRankingTitle('TETRIS PIBAL', W/2, titleY, 44);
 
   // opciones sin caja: solo texto con glow
   menuPulse += 0.04;
@@ -487,11 +479,87 @@ function drawMenu(now) {
   drawMuteIndicator();
 }
 
-function drawNameEntry() {
+function drawPixelNameEntry() {
   drawMenuBg();
-  drawSideFrames(1);
-  drawTitleBox(H*0.16, 52);
-  drawBrickTitle('TETRIS PIBAL', W/2, H*0.16, 52);
+  drawRankingTitle('TETRIS PIBAL', W/2, 132, 44, NAME_ENTRY_NEON_SATURATION);
+
+  const panW = W - 180;
+  const panH = 150;
+  const panX = W/2 - panW/2;
+  const panY = 280;
+  const r = 15;
+
+  ctx.save();
+  ctx.filter = `saturate(${NAME_ENTRY_NEON_SATURATION})`;
+  ctx.shadowColor = 'rgba(255,55,244,0.45)';
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = 'rgba(2,4,15,0.78)';
+  ctx.beginPath(); ctx.roundRect(panX, panY, panW, panH, r); ctx.fill();
+  ctx.shadowBlur = 0;
+
+  const border = ctx.createLinearGradient(panX, panY, panX + panW, panY + panH);
+  border.addColorStop(0, '#ffd21d');
+  border.addColorStop(0.22, '#ff37f4');
+  border.addColorStop(0.48, '#593cff');
+  border.addColorStop(0.70, '#18d7ff');
+  border.addColorStop(0.88, '#75ff22');
+  border.addColorStop(1, '#ffd21d');
+  ctx.strokeStyle = border;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.roundRect(panX, panY, panW, panH, r); ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(255,55,244,0.28)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(panX + 7, panY + 7, panW - 14, panH - 14, r - 6); ctx.stroke();
+
+  const sparkle = (x, y, color) => {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 7;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.lineTo(x, y + 6); ctx.stroke();
+    ctx.restore();
+  };
+
+  sparkle(panX + 24, panY + 22, '#ff5af7');
+  sparkle(panX + 56, panY + 15, '#35cfff');
+  sparkle(panX + panW - 54, panY + 19, '#ffd21d');
+  sparkle(panX + panW - 24, panY + 22, '#ff5af7');
+  sparkle(panX + 24, panY + panH - 22, '#ff5af7');
+  sparkle(panX + panW - 24, panY + panH - 22, '#ffd21d');
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = '900 22px monospace';
+  ctx.shadowColor = 'rgba(255,210,29,0.78)';
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = '#ffd21d';
+  ctx.fillText('INGRES\u00c1 TU NOMBRE', W/2, panY + 48);
+  ctx.shadowBlur = 0;
+  ctx.fillText('INGRES\u00c1 TU NOMBRE', W/2, panY + 48);
+
+  ctx.setLineDash([3, 7]);
+  ctx.strokeStyle = 'rgba(196,54,255,0.78)';
+  ctx.shadowColor = 'rgba(196,54,255,0.55)';
+  ctx.shadowBlur = 8;
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(panX + 30, panY + 76); ctx.lineTo(panX + panW - 30, panY + 76); ctx.stroke();
+  ctx.setLineDash([]);
+  sparkle(W/2, panY + 76, '#9a54ff');
+
+  ctx.restore();
+
+  drawHint('ENTER confirmar   ESC volver', H*0.92);
+  drawMuteIndicator();
+}
+
+function drawNameEntry() {
+  drawPixelNameEntry();
+  return;
+  drawMenuBg();
+  drawRankingTitle('TETRIS PIBAL', W/2, H*0.16, 44);
 
   // panel cálido
   const panW = 320, panH = 140, panX = W/2 - panW/2, panY = H*0.43;
@@ -509,7 +577,6 @@ function drawNameEntry() {
 
 function drawDifficulty() {
   drawMenuBg();
-  drawSideFrames(1);
   drawBrickTitle('DIFICULTAD', W/2, H*0.15, 38, false);
 
   // jugador
@@ -586,7 +653,7 @@ function drawCountdown(now) {
   ctx.globalAlpha = alpha * 0.7;
   const ringR = 72;
   const arcEnd = -Math.PI/2 + (1 - frac) * Math.PI * 2;
-  ctx.lineWidth = 4;
+  ctx.lineWidth = 2.5;
   ctx.strokeStyle = 'rgba(255,255,255,0.1)';
   ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, Math.PI*2); ctx.stroke();
   ctx.shadowColor = pal.glow; ctx.shadowBlur = 12;
@@ -690,15 +757,240 @@ function drawScoreTable(scores, tableTop, maxRows=8) {
   });
 }
 
+function drawRankingTitle(text, x, y, fontSize=58, saturation=NEON_UI_SATURATION) {
+  const font = `900 ${fontSize}px Arial Black, Impact, sans-serif`;
+  const colors = ['#ff3c1f', '#ffd21d', '#39f23b', '#11f3d0', '#2387ff', '#9a54ff', '#f447ff'];
+  const chars = text.split('');
+
+  ctx.save();
+  ctx.filter = `saturate(${saturation})`;
+  ctx.font = font;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+
+  const spacing = fontSize * 0.02;
+  const widths = chars.map(c => c === ' ' ? fontSize * 0.42 : ctx.measureText(c).width + spacing);
+  let cx = x - widths.reduce((a, b) => a + b, 0) / 2;
+  let colorCount = 0;
+
+  chars.forEach((ch, i) => {
+    const lw = widths[i];
+    const lx = cx + lw / 2;
+    if (ch === ' ') { cx += lw; return; }
+
+    const color = colors[colorCount % colors.length];
+    colorCount++;
+
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = font;
+    ctx.lineJoin = 'miter';
+    ctx.miterLimit = 2;
+
+    for (let s = 7; s > 0; s--) {
+      ctx.fillStyle = `rgba(0,0,0,${0.40 - s * 0.035})`;
+      ctx.fillText(ch, lx + s * 0.7, y + s * 0.6);
+    }
+
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 18;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 8;
+    ctx.strokeText(ch, lx, y);
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = 'rgba(0,0,0,0.95)';
+    ctx.lineWidth = 4;
+    ctx.strokeText(ch, lx, y);
+
+    const g = ctx.createLinearGradient(lx, y - fontSize * 0.5, lx, y + fontSize * 0.5);
+    g.addColorStop(0, '#ffffff');
+    g.addColorStop(0.18, color);
+    g.addColorStop(0.52, color);
+    g.addColorStop(1, 'rgba(0,0,0,0.35)');
+    ctx.fillStyle = g;
+    ctx.fillText(ch, lx, y);
+
+    ctx.globalAlpha = 0.34;
+    ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+    ctx.lineWidth = 1;
+    for (let yy = y - fontSize * 0.34; yy < y + fontSize * 0.34; yy += 5) {
+      ctx.beginPath();
+      ctx.moveTo(lx - lw * 0.36, yy);
+      ctx.lineTo(lx + lw * 0.36, yy);
+      ctx.stroke();
+    }
+    ctx.restore();
+    cx += lw;
+  });
+
+  ctx.restore();
+}
+
+function drawRankBadge(rank, x, y) {
+  const palettes = [
+    { fill:'#ffd21d', stroke:'#fff39a', shadow:'rgba(255,210,30,0.75)' },
+    { fill:'#c9d5ea', stroke:'#ffffff', shadow:'rgba(190,220,255,0.65)' },
+    { fill:'#ff8f2a', stroke:'#ffd2a0', shadow:'rgba(255,130,40,0.65)' },
+  ];
+  const p = palettes[rank - 1];
+  if (!p) return false;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.shadowColor = p.shadow;
+  ctx.shadowBlur = 12;
+  ctx.fillStyle = p.fill;
+  ctx.strokeStyle = p.stroke;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const a = -Math.PI / 2 + i * Math.PI / 4;
+    const r = i % 2 === 0 ? 18 : 14;
+    const px = Math.cos(a) * r;
+    const py = Math.sin(a) * r;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#171421';
+  ctx.font = '900 20px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(String(rank), 0, 0);
+  ctx.restore();
+  return true;
+}
+
+function drawPixelScoreTable(scores, tableTop, maxRows=8) {
+  const pad = 26, rowH = 50, headerH = 46, tableW = W - pad * 2;
+  const tableH = headerH + rowH * maxRows;
+  const tableX = pad;
+  const cols = [tableX + 28, tableX + 96, tableX + 258, tableX + 360];
+  const separators = [tableX + 64, tableX + 210, tableX + 336];
+  const bottom = tableTop + tableH;
+
+  ctx.save();
+  ctx.filter = `saturate(${NEON_UI_SATURATION})`;
+  ctx.shadowColor = 'rgba(168,56,255,0.45)';
+  ctx.shadowBlur = 18;
+  ctx.fillStyle = 'rgba(2,4,15,0.72)';
+  ctx.beginPath(); ctx.roundRect(tableX, tableTop, tableW, tableH, 18); ctx.fill();
+  ctx.shadowBlur = 0;
+
+  const border = ctx.createLinearGradient(tableX, tableTop, tableX + tableW, bottom);
+  border.addColorStop(0, '#ffd21d');
+  border.addColorStop(0.25, '#ff37f4');
+  border.addColorStop(0.55, '#593cff');
+  border.addColorStop(0.78, '#18d7ff');
+  border.addColorStop(1, '#75ff22');
+  ctx.strokeStyle = border;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.roundRect(tableX, tableTop, tableW, tableH, 18); ctx.stroke();
+
+  ctx.fillStyle = 'rgba(12,0,32,0.82)';
+  ctx.beginPath(); ctx.roundRect(tableX + 5, tableTop + 5, tableW - 10, headerH - 10, 14); ctx.fill();
+  ctx.strokeStyle = '#ff40f4';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([4, 5]);
+  ctx.beginPath(); ctx.moveTo(tableX + 6, tableTop + headerH); ctx.lineTo(tableX + tableW - 6, tableTop + headerH); ctx.stroke();
+
+  separators.forEach((sx, idx) => {
+    ctx.strokeStyle = idx === 2 ? 'rgba(36,202,255,0.65)' : 'rgba(220,48,255,0.72)';
+    ctx.beginPath(); ctx.moveTo(sx, tableTop + 8); ctx.lineTo(sx, bottom - 8); ctx.stroke();
+  });
+
+  for (let i = 1; i <= maxRows; i++) {
+    const y = tableTop + headerH + i * rowH;
+    ctx.strokeStyle = i % 2 === 0 ? 'rgba(40,198,255,0.45)' : 'rgba(220,48,255,0.48)';
+    ctx.beginPath(); ctx.moveTo(tableX + 8, y); ctx.lineTo(tableX + tableW - 8, y); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  ctx.font = '900 16px monospace';
+  ctx.textBaseline = 'middle';
+  ctx.textAlign = 'left';
+  [
+    { text:'#', x:cols[0], color:'#ff5af7' },
+    { text:'NOMBRE', x:cols[1], color:'#ff5af7' },
+    { text:'SCORE', x:cols[2], color:'#ffd21d' },
+    { text:'DIFICULTAD', x:cols[3], color:'#35cfff' },
+  ].forEach(h => {
+    ctx.shadowColor = h.color;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = h.color;
+    ctx.fillText(h.text, h.x, tableTop + headerH / 2);
+  });
+  ctx.shadowBlur = 0;
+
+  if (scores.length === 0) {
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#bfc7ff';
+    ctx.font = 'bold 16px monospace';
+    ctx.fillText('aun no hay puntajes', W / 2, tableTop + headerH + rowH * 2);
+    ctx.restore();
+    return;
+  }
+
+  scores.slice(0, maxRows).forEach((s, i) => {
+    const rowY = tableTop + headerH + i * rowH;
+    const cy = rowY + rowH / 2;
+    const rank = i + 1;
+    const isNew = s._new;
+    const rankColor = isNew ? '#ffd21d' : rank === 1 ? '#ffd21d' : rank === 2 ? '#d8e6ff' : rank === 3 ? '#ff8f2a' : rank % 2 ? '#ff5af7' : '#35cfff';
+
+    ctx.fillStyle = isNew ? 'rgba(255,210,29,0.12)' : i % 2 === 0 ? 'rgba(255,255,255,0.035)' : 'rgba(55,0,90,0.12)';
+    ctx.fillRect(tableX + 5, rowY + 1, tableW - 10, rowH - 2);
+
+    if (isNew) {
+      ctx.strokeStyle = 'rgba(255,210,29,0.75)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(tableX + 6, rowY + 4, tableW - 12, rowH - 8);
+    }
+
+    ctx.textBaseline = 'middle';
+    ctx.textAlign = 'left';
+    if (!drawRankBadge(rank, cols[0] + 5, cy)) {
+      ctx.shadowColor = rankColor; ctx.shadowBlur = 8;
+      ctx.fillStyle = rankColor;
+      ctx.font = '900 18px monospace';
+      ctx.fillText(String(rank), cols[0], cy);
+      ctx.shadowBlur = 0;
+    }
+
+    ctx.fillStyle = isNew ? '#fff5a8' : '#ffffff';
+    ctx.shadowColor = isNew ? 'rgba(255,210,29,0.75)' : 'rgba(255,255,255,0.28)';
+    ctx.shadowBlur = isNew ? 10 : 5;
+    ctx.font = `${isNew ? '900' : '700'} 16px monospace`;
+    ctx.fillText(s.name.substring(0, 12), cols[1], cy);
+
+    ctx.fillStyle = '#ffd21d';
+    ctx.shadowColor = 'rgba(255,210,29,0.75)';
+    ctx.shadowBlur = 10;
+    ctx.font = '900 16px monospace';
+    ctx.fillText(s.score.toLocaleString(), cols[2], cy);
+
+    ctx.fillStyle = '#35cfff';
+    ctx.shadowColor = 'rgba(53,207,255,0.60)';
+    ctx.shadowBlur = 8;
+    ctx.font = '700 13px monospace';
+    ctx.fillText(s.diff.substring(0, 18), cols[3], cy);
+    ctx.shadowBlur = 0;
+  });
+  ctx.restore();
+}
+
 function drawLeaderboard() {
   drawMenuBg();
-  drawSideFrames(1);
-  drawGoldTitle('RANKING', W/2, 62, 40, false);
+  drawRankingTitle('RANKING', W/2, 76, 52);
   if (!leaderboardRefreshing) {
     leaderboardRefreshing = true;
     fetchScoresFromSupabase().finally(() => { leaderboardRefreshing = false; });
   }
-  drawScoreTable(loadScores(), 108, 8);
+  drawPixelScoreTable(loadScores(), 142, 8);
   menuPulse += 0.04;
   ctx.save();
   ctx.globalAlpha = 0.5 + 0.5*Math.sin(menuPulse);
@@ -707,11 +999,111 @@ function drawLeaderboard() {
   drawMuteIndicator();
 }
 
-function drawCredits() {
+function drawPixelCredits() {
   drawMenuBg();
-  drawSideFrames(1);
-  drawTitleBox(72, 42);
-  drawBrickTitle('TETRIS PIBAL', W/2, 72, 42, false);
+  drawRankingTitle('CR\u00c9DITOS', W/2, 130, 34);
+
+  const panW = W - 150;
+  const panH = 300;
+  const panX = W/2 - panW/2;
+  const panY = 205;
+  const r = 15;
+
+  ctx.save();
+  ctx.filter = `saturate(${NEON_UI_SATURATION})`;
+  ctx.shadowColor = 'rgba(255,55,244,0.45)';
+  ctx.shadowBlur = 14;
+  ctx.fillStyle = 'rgba(2,4,15,0.78)';
+  ctx.beginPath(); ctx.roundRect(panX, panY, panW, panH, r); ctx.fill();
+  ctx.shadowBlur = 0;
+
+  const border = ctx.createLinearGradient(panX, panY, panX + panW, panY + panH);
+  border.addColorStop(0, '#ffd21d');
+  border.addColorStop(0.18, '#ff37f4');
+  border.addColorStop(0.42, '#593cff');
+  border.addColorStop(0.65, '#18d7ff');
+  border.addColorStop(0.84, '#75ff22');
+  border.addColorStop(1, '#ffd21d');
+  ctx.strokeStyle = border;
+  ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.roundRect(panX, panY, panW, panH, r); ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(255,55,244,0.32)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect(panX + 7, panY + 7, panW - 14, panH - 14, r - 6); ctx.stroke();
+
+  const sparkle = (x, y, color) => {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 7;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y - 6); ctx.lineTo(x, y + 6); ctx.stroke();
+    ctx.restore();
+  };
+
+  sparkle(panX + 24, panY + 22, '#ff5af7');
+  sparkle(panX + panW - 24, panY + 22, '#ff5af7');
+  sparkle(panX + 24, panY + panH - 22, '#ff5af7');
+  sparkle(panX + panW - 24, panY + panH - 22, '#ffd21d');
+
+  const divider = y => {
+    ctx.save();
+    ctx.setLineDash([3, 7]);
+    ctx.strokeStyle = 'rgba(196,54,255,0.78)';
+    ctx.shadowColor = 'rgba(196,54,255,0.55)';
+    ctx.shadowBlur = 8;
+    ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(panX + 30, y); ctx.lineTo(panX + panW - 30, y); ctx.stroke();
+    ctx.setLineDash([]);
+    sparkle(W/2, y, '#9a54ff');
+    ctx.restore();
+  };
+
+  const pixelText = (text, y, font, fill, glow, alpha=1) => {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = font;
+    ctx.shadowColor = glow;
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = fill;
+    ctx.fillText(text, W/2, y);
+    ctx.shadowBlur = 0;
+    ctx.fillText(text, W/2, y);
+    ctx.restore();
+  };
+
+  pixelText('CREADO POR', panY + 34, '900 15px monospace', '#ff5af7', 'rgba(255,90,247,0.75)');
+  pixelText('Turcovein', panY + 64, '900 27px monospace', '#ffd21d', 'rgba(255,210,29,0.85)');
+  divider(panY + 90);
+
+  pixelText('DESARROLLADO CON', panY + 116, '900 14px monospace', '#c45aff', 'rgba(196,90,255,0.70)');
+  pixelText('Claude (Anthropic)', panY + 145, '800 17px monospace', '#ffffff', 'rgba(255,255,255,0.55)');
+  divider(panY + 174);
+
+  pixelText('ASSETS', panY + 202, '900 15px monospace', '#c45aff', 'rgba(196,90,255,0.70)');
+  pixelText('Im\u00e1genes y videos', panY + 230, '800 17px monospace', '#ffffff', 'rgba(255,255,255,0.55)');
+  pixelText('por Turcovein', panY + 256, '800 16px monospace', '#ffffff', 'rgba(255,255,255,0.50)');
+
+  pixelText('\u00a1Gracias pibe por jugar!', panY + 284, '900 17px monospace', '#75ffb0', 'rgba(117,255,176,0.78)');
+  ctx.restore();
+
+  menuPulse += 0.04;
+  ctx.save();
+  ctx.globalAlpha = 0.5 + 0.5 * Math.sin(menuPulse);
+  drawHint('ENTER / ESC para volver', H - 28);
+  ctx.restore();
+  drawMuteIndicator();
+}
+
+function drawCredits() {
+  drawPixelCredits();
+  return;
+  drawMenuBg();
+  drawRankingTitle('TETRIS PIBAL', W/2, 72, 36);
 
   const panW = 340, panH = 330, panX = W/2 - panW/2, panY = 140;
   drawWarmPanel(panX, panY, panW, panH);

@@ -53,14 +53,15 @@ nameInput.enterKeyHint = 'done';
 Object.assign(nameInput.style, {
   position:'absolute', left:'50%', top:'52%',
   transform:'translate(-50%,-50%)',
-  background:'rgba(20,20,45,0.82)',
+  background:'rgba(1,3,12,0.78)',
   color:'#ffffff',
-  border:'2px solid rgba(180,180,255,0.6)',
-  borderRadius:'10px',
-  padding:'10px 18px', fontSize:'22px', fontFamily:'monospace',
+  border:'2px solid #ff40f4',
+  borderRadius:'8px',
+  padding:'8px 14px', fontSize:'19px', fontFamily:'monospace',
   textAlign:'center', outline:'none', display:'none', zIndex:'10',
-  width:'260px',
-  boxShadow:'0 0 18px rgba(100,120,255,0.35), inset 0 1px 0 rgba(255,255,255,0.15)',
+  width:'220px',
+  filter:'saturate(0.5)',
+  boxShadow:'0 0 18px rgba(255,55,244,0.55), 0 0 26px rgba(24,215,255,0.28), inset 0 0 18px rgba(89,60,255,0.20)',
   caretColor:'#ffe600',
 });
 document.body.appendChild(nameInput);
