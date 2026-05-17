@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Tetris Pibal</string>
+    <string name="title_activity_main">Tetris Pibal</string>
+    <string name="package_name">com.turcovein.tetrispibal</string>
+    <string name="custom_url_scheme">com.turcovein.tetrispibal</string>
+</resources>

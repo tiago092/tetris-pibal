@@ -5,9 +5,13 @@ let currentMusicLevel = -1;
 let musicUnlocked = false;
 let fadeInterval = null;
 let musicMuted = false;
+let musicPlayToken = 0;
 
 function unlockAudio() {
-  if (audioCtx) return;
+  if (audioCtx) {
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+    return;
+  }
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 }
 
@@ -129,6 +133,7 @@ function playMenuTick() {
 function loadSound(path, volume=1.0) {
   const a = new Audio(path);
   a.volume = volume;
+  a.preload = 'auto';
   return a;
 }
 
@@ -139,6 +144,7 @@ const deathSound    = loadSound(SOUND_CONFIG.death,    1.0);
 const defeatSong    = new Audio(SOUND_CONFIG.defeatSong);
 defeatSong.loop     = true;
 defeatSong.volume   = 0.8;
+defeatSong.preload  = 'auto';
 const monsterSound = loadSound(SOUND_CONFIG.monster,   1.0);
 
 function playSound(el) {
@@ -148,6 +154,7 @@ function playSound(el) {
 }
 
 function stopMusic() {
+  musicPlayToken++;
   if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null; }
   if (musicEl) { musicEl.pause(); musicEl.src = ''; musicEl = null; }
   currentMusicLevel = -1;
@@ -162,7 +169,9 @@ function toggleMute() {
 }
 
 function playMusic(level) {
-  const FADE_MS = 2000;
+  musicPlayToken++;
+  const token = musicPlayToken;
+  const FADE_MS = 700;
   const TARGET = getTheme(level).musicVolume ?? 0.5;
   const STEP_MS = 50;
 
@@ -174,6 +183,7 @@ function playMusic(level) {
   incoming.loop = true;
   incoming.volume = 0;
   incoming.muted = musicMuted;
+  incoming.preload = 'auto';
 
   const outgoing = musicEl;
   musicEl = incoming;
@@ -199,11 +209,22 @@ function playMusic(level) {
     }, STEP_MS);
   }
 
+  function retryPlay() {
+    if (token !== musicPlayToken || musicEl !== incoming || musicMuted) return;
+    incoming.play().then(() => {
+      startFade();
+    }).catch(() => {});
+  }
+
   incoming.play().then(() => {
+    if (token !== musicPlayToken || musicEl !== incoming) { incoming.pause(); incoming.src = ''; return; }
     startFade();
   }).catch(() => {
+    if (token !== musicPlayToken || musicEl !== incoming) { incoming.pause(); incoming.src = ''; return; }
     incoming.volume = TARGET;
     if (outgoing) { outgoing.pause(); outgoing.src = ''; }
+    setTimeout(retryPlay, 250);
+    setTimeout(retryPlay, 1000);
   });
 }
 

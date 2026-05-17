@@ -154,20 +154,6 @@ const SUPA_URL = 'https://ucnaukurijvlmxgofhmv.supabase.co/rest/v1';
 const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjbmF1a3VyaWp2bG14Z29maG12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MzgxMDQsImV4cCI6MjA5NDMxNDEwNH0.IZmwY81Gm_zRYWiuw0-1eTAcIh0h7-q4W5ZIDAuFml0';
 
 let cachedScores = null;
-let geoInfo = null;
-
-async function fetchGeoInfo() {
-  if (geoInfo) return geoInfo;
-  try {
-    const res = await fetch('https://ipapi.co/json/');
-    if (!res.ok) throw new Error();
-    const d = await res.json();
-    geoInfo = { country: d.country_name || '', city: d.city || '' };
-  } catch {
-    geoInfo = { country: '', city: '' };
-  }
-  return geoInfo;
-}
 
 function getDeviceType() {
   return /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
@@ -199,7 +185,6 @@ function loadScores() {
 
 async function saveScoreToSupabase(entry) {
   try {
-    const geo = await fetchGeoInfo();
     await fetch(`${SUPA_URL}/scores`, {
       method: 'POST',
       headers: {
@@ -211,7 +196,7 @@ async function saveScoreToSupabase(entry) {
       body: JSON.stringify({
         name: entry.name, score: entry.score, diff: entry.diff,
         level: entry.level, won: entry.won,
-        country: geo.country, city: geo.city, device: getDeviceType()
+        country: '', city: '', device: getDeviceType()
       })
     });
     cachedScores = null;
@@ -226,9 +211,8 @@ function saveScore(entry) {
   saveScoreToSupabase(entry);
 }
 
-// Pre-cargar scores y geo al iniciar
+// Pre-cargar scores al iniciar
 fetchScoresFromSupabase();
-fetchGeoInfo();
 
 // ---- Shake ----
 let shake = { intensity: 0, duration: 0, elapsed: 0 };

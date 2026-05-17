@@ -34,6 +34,7 @@ const levelBgVideo = document.createElement('video');
 levelBgVideo.loop = true;
 levelBgVideo.muted = true;
 levelBgVideo.playsInline = true;
+levelBgVideo.preload = 'auto';
 levelBgVideo.style.display = 'none';
 document.body.appendChild(levelBgVideo);
 
@@ -42,6 +43,7 @@ const levelBgAudio = document.createElement('video');
 levelBgAudio.muted = false;
 levelBgAudio.loop = true;
 levelBgAudio.playsInline = true;
+levelBgAudio.preload = 'auto';
 levelBgAudio.style.display = 'none';
 document.body.appendChild(levelBgAudio);
 
@@ -57,13 +59,17 @@ function startLevelBgAudio(src) {
 }
 
 let currentLevelBgSrc = '';
+let levelBgPlayToken = 0;
 
-function startLevelBgVideo(src, loop=true, onEnded=null, maxLoops=null, onLoopsComplete=null) {
+function startLevelBgVideo(src, loop=true, onEnded=null, maxLoops=null, onLoopsComplete=null, muted=false) {
   if (currentLevelBgSrc === src) return;
+  levelBgPlayToken++;
+  const token = levelBgPlayToken;
   currentLevelBgSrc = src;
   levelBgVideo.loop = maxLoops ? false : loop;
+  levelBgVideo.muted = !!muted;
+  levelBgVideo.playsInline = true;
   levelBgVideo.src = src;
-  levelBgVideo.muted = false;
 
   if (maxLoops) {
     let loopCount = 0;
@@ -82,11 +88,16 @@ function startLevelBgVideo(src, loop=true, onEnded=null, maxLoops=null, onLoopsC
     levelBgVideo.addEventListener('ended', onEnded, { once: true });
   }
 
-  levelBgVideo.play().catch(() => { levelBgVideo.muted = true; levelBgVideo.play().catch(()=>{}); });
+  levelBgVideo.play().catch(() => {
+    if (token !== levelBgPlayToken) return;
+    levelBgVideo.muted = true;
+    levelBgVideo.play().catch(() => {});
+  });
 }
 
 function stopLevelBgVideo() {
   if (!currentLevelBgSrc) return;
+  levelBgPlayToken++;
   currentLevelBgSrc = '';
   levelBgVideo.muted = true;
   levelBgVideo.pause();
@@ -100,6 +111,7 @@ winVideo.loop = true;
 winVideo.playsInline = true;
 winVideo.style.display = 'none';
 winVideo.src = WIN_CONFIG.video;
+winVideo.preload = 'auto';
 document.body.appendChild(winVideo);
 
 // Imagen y música del menú principal
@@ -108,3 +120,4 @@ menuImg.src = MENU_CONFIG.bg;
 const introMusic = new Audio(MENU_CONFIG.music);
 introMusic.loop = true;
 introMusic.volume = 0.7;
+introMusic.preload = 'auto';

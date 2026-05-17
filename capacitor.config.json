@@ -1,0 +1,8 @@
+{
+  "appId": "com.turcovein.tetrispibal",
+  "appName": "Tetris Pibal",
+  "webDir": "dist-mobile",
+  "server": {
+    "androidScheme": "https"
+  }
+}

@@ -2,19 +2,37 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0a0a16">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Tetris Pibal">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Tetris Pibal</title>
   <link rel="icon" type="image/png" href="assets/img/tonywarrior.webp">
+  <link rel="apple-touch-icon" href="assets/img/tonywarrior.webp">
+  <link rel="manifest" href="manifest.webmanifest">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    html {
+      background: #0a0a16;
+      height: 100%;
+      overscroll-behavior: none;
+    }
     body {
       background: #0a0a16;
       display: flex;
       justify-content: center;
       align-items: center;
-      height: 100vh;
+      min-height: 100vh;
+      min-height: 100dvh;
       overflow: hidden;
       font-family: monospace;
+      padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
     }
     canvas {
       display: block;
@@ -23,8 +41,92 @@
       max-height: 100vh;
       width: auto;
       height: auto;
+      touch-action: none;
     }
     #gameOverVideo { display: none; }
+    #touchControls {
+      display: none;
+      pointer-events: none;
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      font-family: monospace;
+    }
+    #touchControls.is-visible {
+      display: block;
+    }
+    .touch-top,
+    .touch-pad {
+      position: absolute;
+      left: max(12px, env(safe-area-inset-left));
+      right: max(12px, env(safe-area-inset-right));
+      pointer-events: none;
+    }
+    .touch-top {
+      top: max(10px, env(safe-area-inset-top));
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .touch-pad {
+      bottom: max(12px, env(safe-area-inset-bottom));
+      display: none;
+      align-items: end;
+      justify-content: space-between;
+      gap: 16px;
+    }
+    #touchControls.show-game .touch-pad {
+      display: flex;
+    }
+    .touch-cluster {
+      display: grid;
+      gap: 10px;
+    }
+    .touch-left-cluster {
+      grid-template-columns: repeat(2, 64px);
+    }
+    .touch-right-cluster {
+      grid-template-columns: repeat(3, 58px);
+    }
+    .touch-btn {
+      pointer-events: auto;
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(55,58,76,0.88), rgba(18,20,34,0.92));
+      color: #f0f2ff;
+      min-width: 52px;
+      min-height: 46px;
+      padding: 0 12px;
+      font: bold 18px monospace;
+      box-shadow: 0 8px 18px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.18);
+      text-shadow: 0 2px 4px rgba(0,0,0,0.7);
+    }
+    .touch-btn.is-pressed {
+      transform: translateY(1px) scale(0.98);
+      background: linear-gradient(180deg, rgba(110,86,12,0.95), rgba(44,32,4,0.96));
+      color: #ffe600;
+    }
+    .touch-action {
+      width: 64px;
+      height: 58px;
+      font-size: 25px;
+    }
+    .touch-hard {
+      color: #ffe600;
+    }
+    .touch-back,
+    .touch-confirm,
+    .touch-pause {
+      visibility: hidden;
+    }
+    #touchControls.show-back .touch-back,
+    #touchControls.show-confirm .touch-confirm,
+    #touchControls.show-pause .touch-pause {
+      visibility: visible;
+    }
+    @media (pointer: fine) and (min-width: 901px) {
+      #touchControls { display: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -39,6 +141,7 @@
   <script src="js/menu.js"></script>
   <script src="js/animations.js"></script>
   <script src="js/game.js"></script>
+  <script src="js/touch-controls.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>
