@@ -2,7 +2,8 @@
 let cachedMenuBg = null;
 let cachedCountdownBg = null;
 const NEON_UI_SATURATION = 0.7;
-const NAME_ENTRY_NEON_SATURATION = 0.5;
+const PANEL_NEON_SATURATION = 0.46;
+const NAME_ENTRY_NEON_SATURATION = 0.36;
 
 function makeMenuBgCache(kind) {
   if (!menuImg.complete || !menuImg.naturalWidth) return null;
@@ -10,7 +11,7 @@ function makeMenuBgCache(kind) {
   off.width = W; off.height = H;
   const oc = off.getContext('2d');
   oc.filter = kind === 'countdown'
-    ? 'brightness(0.65) saturate(1.5) contrast(1.05)'
+    ? 'brightness(1.00) saturate(0.80) contrast(1.00)'
     : 'brightness(0.80) saturate(0.80) contrast(0.80)';
   oc.drawImage(menuImg, 0, 0, W, H);
   oc.filter = 'none';
@@ -155,46 +156,6 @@ function drawBrickTitle(text, x, y, fontSize=52, bold=true) {
   ctx.restore();
 }
 
-function drawGoldTitle(text, x, y, fontSize=52, bold=true) {
-  const font = `${bold?'bold ':''}${fontSize}px monospace`;
-  ctx.save();
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = font;
-
-  // capa de profundidad (sombra 3D)
-  for (let i = 10; i > 0; i--) {
-    ctx.fillStyle = `rgba(80,40,0,${0.6 - i*0.04})`;
-    ctx.fillText(text, x + i, y + i);
-  }
-
-  // contorno negro grueso
-  ctx.strokeStyle = 'rgba(0,0,0,0.9)';
-  ctx.lineWidth = 6;
-  ctx.lineJoin = 'round';
-  ctx.strokeText(text, x, y);
-
-  // gradiente dorado vertical
-  const metrics = ctx.measureText(text);
-  const tw = metrics.width, th = fontSize;
-  const grad = ctx.createLinearGradient(x, y - th/2, x, y + th/2);
-  grad.addColorStop(0.0,  '#fff8c0');
-  grad.addColorStop(0.25, '#ffe033');
-  grad.addColorStop(0.5,  '#ffb800');
-  grad.addColorStop(0.75, '#cc7a00');
-  grad.addColorStop(1.0,  '#ffd700');
-  ctx.fillStyle = grad;
-  ctx.fillText(text, x, y);
-
-  // destello blanco fino en la parte alta
-  const shine = ctx.createLinearGradient(x, y - th/2, x, y - th/2 + th*0.35);
-  shine.addColorStop(0, 'rgba(255,255,255,0.55)');
-  shine.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = shine;
-  ctx.fillText(text, x, y);
-
-  ctx.restore();
-}
-
 function drawGlowText(text, x, y, font, color, glowColor, glowBlur=18) {
   ctx.save();
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -218,6 +179,64 @@ function drawHint(text, y, alpha=0.8) {
   ctx.restore();
 }
 
+function drawCountdownDigit(value, x, y, fontSize, color, glow, alpha=1) {
+  const text = String(value);
+  const font = `900 ${fontSize}px Arial Black, Impact, sans-serif`;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = font;
+  ctx.lineJoin = 'miter';
+  ctx.miterLimit = 2;
+  ctx.filter = `saturate(${NEON_UI_SATURATION})`;
+
+  for (let s = 6; s > 0; s--) {
+    ctx.fillStyle = `rgba(0,0,0,${0.34 - s * 0.04})`;
+    ctx.fillText(text, x + s * 0.65, y + s * 0.55);
+  }
+
+  ctx.shadowColor = glow;
+  ctx.shadowBlur = fontSize * 0.18;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(6, fontSize * 0.12);
+  ctx.strokeText(text, x, y);
+
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(0,0,0,0.95)';
+  ctx.lineWidth = Math.max(3, fontSize * 0.06);
+  ctx.strokeText(text, x, y);
+
+  const fill = ctx.createLinearGradient(x, y - fontSize * 0.55, x, y + fontSize * 0.55);
+  fill.addColorStop(0, 'rgba(255,255,255,0.94)');
+  fill.addColorStop(0.14, color);
+  fill.addColorStop(0.62, color);
+  fill.addColorStop(1, 'rgba(0,0,0,0.28)');
+  ctx.fillStyle = fill;
+  ctx.fillText(text, x, y);
+
+  ctx.save();
+  ctx.globalAlpha *= 0.22;
+  ctx.strokeStyle = 'rgba(255,255,255,0.9)';
+  ctx.lineWidth = Math.max(1, fontSize * 0.02);
+  const halfW = ctx.measureText(text).width * 0.34;
+  for (let yy = y - fontSize * 0.30; yy < y + fontSize * 0.30; yy += Math.max(4, fontSize * 0.08)) {
+    ctx.beginPath();
+    ctx.moveTo(x - halfW, yy);
+    ctx.lineTo(x + halfW, yy);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  const gloss = ctx.createLinearGradient(x, y - fontSize * 0.52, x, y - fontSize * 0.08);
+  gloss.addColorStop(0, 'rgba(255,255,255,0.45)');
+  gloss.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = gloss;
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
 function drawMuteIndicator() {
   const icon = musicMuted ? '🔇' : '🔊';
   const label = musicMuted ? 'SIN SONIDO' : 'MÚSICA';
@@ -229,99 +248,6 @@ function drawMuteIndicator() {
   ctx.shadowBlur = 8;
   ctx.fillText(`${icon} ${label}  [M]`, W - 10, 10);
   ctx.restore();
-}
-
-// Botón metálico oscuro
-function drawMenuBtn(x, y, w, h, label, selected) {
-  const r = 12;
-  ctx.save();
-
-  // sombra exterior
-  ctx.shadowColor = selected ? 'rgba(255,220,0,0.45)' : 'rgba(0,0,0,0.6)';
-  ctx.shadowBlur   = selected ? 18 : 8;
-  ctx.shadowOffsetY = 2;
-
-  // cuerpo: gradiente metálico oscuro
-  const g = ctx.createLinearGradient(x, y, x, y + h);
-  if (selected) {
-    g.addColorStop(0,    'rgba(110,85,10,0.65)');
-    g.addColorStop(0.45, 'rgba(70,50,5,0.65)');
-    g.addColorStop(1,    'rgba(40,28,0,0.65)');
-  } else {
-    g.addColorStop(0,    'rgba(70,70,90,0.55)');
-    g.addColorStop(0.45, 'rgba(40,40,60,0.55)');
-    g.addColorStop(1,    'rgba(20,20,35,0.55)');
-  }
-  ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
-  ctx.fillStyle = g; ctx.fill();
-  ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
-
-  // borde metálico: línea superior clara + borde exterior
-  ctx.save();
-  ctx.beginPath(); ctx.roundRect(x, y, w, h, r); ctx.clip();
-  // reflejo metálico diagonal
-  const shine = ctx.createLinearGradient(x, y, x + w * 0.6, y + h);
-  shine.addColorStop(0,    'rgba(255,255,255,0.18)');
-  shine.addColorStop(0.35, 'rgba(255,255,255,0.06)');
-  shine.addColorStop(0.36, 'rgba(255,255,255,0.13)');
-  shine.addColorStop(1,    'rgba(255,255,255,0.02)');
-  ctx.fillStyle = shine; ctx.fillRect(x, y, w, h);
-  // línea de brillo superior
-  ctx.fillStyle = selected ? 'rgba(255,220,80,0.35)' : 'rgba(255,255,255,0.22)';
-  ctx.fillRect(x + r, y + 1, w - r * 2, 2);
-  ctx.restore();
-
-  // borde exterior
-  ctx.beginPath(); ctx.roundRect(x, y, w, h, r);
-  ctx.strokeStyle = selected ? '#ffe600' : 'rgba(180,180,210,0.55)';
-  ctx.lineWidth   = selected ? 2 : 1.5;
-  ctx.stroke();
-
-  // texto
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = selected ? 'bold 23px monospace' : 'bold 20px monospace';
-  if (selected) {
-    ctx.shadowColor = 'rgba(255,200,0,0.8)'; ctx.shadowBlur = 12;
-    ctx.fillStyle = '#ffe600';
-  } else {
-    ctx.shadowColor = 'rgba(0,0,0,0.7)'; ctx.shadowBlur = 4;
-    ctx.fillStyle = '#ddddf5';
-  }
-  ctx.fillText(label, x + w / 2, y + h / 2);
-
-  ctx.restore();
-}
-
-// Panel de fondo metálico oscuro (para sub-menús)
-function drawWarmPanel(x, y, w, h) {
-  ctx.save();
-  ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 20;
-  ctx.beginPath(); ctx.roundRect(x, y, w, h, 14);
-  const pg = ctx.createLinearGradient(x, y, x, y + h);
-  pg.addColorStop(0, 'rgba(60,60,80,0.60)');
-  pg.addColorStop(1, 'rgba(20,20,36,0.60)');
-  ctx.fillStyle = pg; ctx.fill();
-  ctx.shadowBlur = 0;
-  // brillo diagonal metálico
-  ctx.save(); ctx.beginPath(); ctx.roundRect(x, y, w, h, 14); ctx.clip();
-  const ms = ctx.createLinearGradient(x, y, x + w, y + h * 0.6);
-  ms.addColorStop(0,    'rgba(255,255,255,0.10)');
-  ms.addColorStop(0.5,  'rgba(255,255,255,0.03)');
-  ms.addColorStop(0.51, 'rgba(255,255,255,0.08)');
-  ms.addColorStop(1,    'rgba(255,255,255,0.01)');
-  ctx.fillStyle = ms; ctx.fillRect(x, y, w, h);
-  // línea superior brillante
-  ctx.fillStyle = 'rgba(255,255,255,0.18)';
-  ctx.fillRect(x + 14, y + 1, w - 28, 2);
-  ctx.restore();
-  // borde
-  ctx.beginPath(); ctx.roundRect(x, y, w, h, 14);
-  ctx.strokeStyle = 'rgba(200,200,230,0.45)'; ctx.lineWidth = 1.5; ctx.stroke();
-  ctx.restore();
-}
-
-function drawMenuPanel(x, y, w, h, selected) {
-  drawMenuBtn(x, y, w, h, '', selected);
 }
 
 // easing: caída con rebote
@@ -437,7 +363,7 @@ function drawMenu(now) {
   // opciones sin caja: solo texto con glow
   menuPulse += 0.04;
   MENU_OPTIONS.forEach((opt, i) => {
-    const cyBase = H * 0.47 + i * 62;
+    const cyBase = H * MENU_CONFIG.optionsStartY + i * MENU_CONFIG.optionsGap;
     const btnDelay = 200 + i * 120;
     const btnT = Math.min(1, Math.max(0, (age - btnDelay) / 500));
     const slideEase = 1 - Math.pow(1 - btnT, 3);
@@ -491,7 +417,7 @@ function drawPixelNameEntry() {
 
   ctx.save();
   ctx.filter = `saturate(${NAME_ENTRY_NEON_SATURATION})`;
-  ctx.shadowColor = 'rgba(255,55,244,0.45)';
+  ctx.shadowColor = 'rgba(252, 116, 245, 0.45)';
   ctx.shadowBlur = 14;
   ctx.fillStyle = 'rgba(2,4,15,0.78)';
   ctx.beginPath(); ctx.roundRect(panX, panY, panW, panH, r); ctx.fill();
@@ -557,22 +483,6 @@ function drawPixelNameEntry() {
 
 function drawNameEntry() {
   drawPixelNameEntry();
-  return;
-  drawMenuBg();
-  drawRankingTitle('TETRIS PIBAL', W/2, H*0.16, 44);
-
-  // panel cálido
-  const panW = 320, panH = 140, panX = W/2 - panW/2, panY = H*0.43;
-  drawWarmPanel(panX, panY, panW, panH);
-
-  ctx.save();
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = 'bold 20px monospace'; ctx.fillStyle = '#c8d8ff';
-  ctx.fillText('INGRESÁ TU NOMBRE', W/2, panY + 28);
-  ctx.restore();
-
-  drawHint('ENTER confirmar   ESC volver', H*0.82);
-  drawMuteIndicator();
 }
 
 function drawDifficulty() {
@@ -633,9 +543,9 @@ function drawCountdown(now) {
   if (countdownVal <= 0) { inCountdown = false; return; }
 
   const frac  = (elapsed % 1000) / 1000;
-  const scale = 1.2 - frac * 0.35;
+  const scale = 1.06 - frac * 0.18;
   const alpha = (frac < 0.6 ? 1 : 1 - (frac - 0.6) / 0.4) * 0.82;
-  const sz    = Math.round(90 * scale);
+  const sz    = Math.round(72 * scale);
 
   const palettes = [
     null,
@@ -650,45 +560,19 @@ function drawCountdown(now) {
 
   // anillo fino
   ctx.save();
-  ctx.globalAlpha = alpha * 0.7;
-  const ringR = 72;
+  ctx.globalAlpha = alpha * 0.55;
+  const ringR = 58;
   const arcEnd = -Math.PI/2 + (1 - frac) * Math.PI * 2;
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 2;
   ctx.strokeStyle = 'rgba(255,255,255,0.1)';
   ctx.beginPath(); ctx.arc(cx, cy, ringR, 0, Math.PI*2); ctx.stroke();
-  ctx.shadowColor = pal.glow; ctx.shadowBlur = 12;
+  ctx.shadowColor = pal.glow; ctx.shadowBlur = 10;
   ctx.strokeStyle = pal.ring;
   ctx.beginPath(); ctx.arc(cx, cy, ringR, -Math.PI/2, arcEnd); ctx.stroke();
   ctx.restore();
 
   // número con efecto 3D y glow
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.font = `bold ${sz}px monospace`;
-  ctx.lineJoin = 'round';
-  // sombra 3D profunda
-  for (let i = 10; i > 0; i--) {
-    ctx.fillStyle = `rgba(0,0,0,${0.5 - i * 0.04})`;
-    ctx.fillText(String(countdownVal), cx + i, cy + i);
-  }
-  // contorno negro grueso
-  ctx.strokeStyle = 'rgba(0,0,0,0.95)'; ctx.lineWidth = 10;
-  ctx.strokeText(String(countdownVal), cx, cy);
-  // glow del color
-  ctx.shadowColor = pal.glow; ctx.shadowBlur = 35;
-  ctx.fillStyle = pal.mid;
-  ctx.fillText(String(countdownVal), cx, cy);
-  ctx.shadowBlur = 14;
-  ctx.fillText(String(countdownVal), cx, cy);
-  ctx.shadowBlur = 0;
-  // gloss superior
-  const glossG = ctx.createLinearGradient(cx, cy - sz/2, cx, cy);
-  glossG.addColorStop(0, 'rgba(255,255,255,0.75)');
-  glossG.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = glossG;
-  ctx.fillText(String(countdownVal), cx, cy);
-  ctx.restore();
+  drawCountdownDigit(countdownVal, cx, cy, sz, pal.mid, pal.glow, alpha);
 
   // jugador y dificultad
   ctx.save();
@@ -696,65 +580,6 @@ function drawCountdown(now) {
   drawGlowText(`${playerName}  ·  ${currentDiff.name}`, W/2, H*0.72, '15px monospace', '#e0e8ff', 'rgba(100,140,255,0.6)', 8);
   ctx.restore();
   drawHint('preparate...', H*0.80);
-}
-
-function drawScoreTable(scores, tableTop, maxRows=8) {
-  const pad = 28, rowH = 50, tableW = W - pad*2;
-  const cols = [pad+10, pad+55, pad+240, pad+360];
-  const medals = ['🥇','🥈','🥉'];
-
-  // panel de fondo cálido
-  drawWarmPanel(pad, tableTop, tableW, rowH * maxRows + 46);
-
-  // cabecera metálica
-  ctx.save();
-  const hg = ctx.createLinearGradient(pad, tableTop, pad, tableTop+44);
-  hg.addColorStop(0, 'rgba(90,90,130,0.98)');
-  hg.addColorStop(1, 'rgba(40,40,70,0.98)');
-  ctx.fillStyle = hg;
-  ctx.beginPath(); ctx.roundRect(pad, tableTop, tableW, 44, [14,14,0,0]); ctx.fill();
-  ctx.fillStyle = '#e0e8ff'; ctx.font = 'bold 13px monospace';
-  ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-  [['#',cols[0]],['Nombre',cols[1]],['Score',cols[2]],['Dificultad',cols[3]]].forEach(([h,x])=>ctx.fillText(h,x,tableTop+22));
-  ctx.strokeStyle = 'rgba(160,140,255,0.7)'; ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.moveTo(pad,tableTop+44); ctx.lineTo(pad+tableW,tableTop+44); ctx.stroke();
-  ctx.restore();
-
-  if (scores.length === 0) {
-    ctx.save();
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.fillStyle='#aaaadd'; ctx.font='15px monospace';
-    ctx.fillText('— aún no hay puntajes —', W/2, tableTop + rowH*2);
-    ctx.restore();
-    return;
-  }
-
-  scores.slice(0, maxRows).forEach((s, i) => {
-    const rowY = tableTop + 44 + i * rowH;
-    const cy = rowY + rowH/2;
-    const isNew = s._new;
-    ctx.save();
-    ctx.fillStyle = isNew ? 'rgba(255,230,0,0.13)' : i%2===0 ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.18)';
-    ctx.fillRect(pad+1, rowY, tableW-2, rowH);
-    if (isNew) {
-      ctx.strokeStyle='rgba(255,220,0,0.8)'; ctx.lineWidth=1.5;
-      ctx.strokeRect(pad+1, rowY, tableW-2, rowH);
-    }
-    ctx.strokeStyle='rgba(255,255,255,0.07)'; ctx.lineWidth=1;
-    ctx.beginPath(); ctx.moveTo(pad+1,rowY+rowH); ctx.lineTo(pad+tableW-1,rowY+rowH); ctx.stroke();
-
-    const rankColor = isNew?'#ffe600':i===0?'#ffd700':i===1?'#e8e8e8':i===2?'#e8a060':'#c0c8ff';
-    ctx.textBaseline='middle'; ctx.textAlign='left';
-    ctx.fillStyle=rankColor; ctx.font='bold 14px monospace';
-    ctx.fillText(i<3 ? medals[i] : `${i+1}`, cols[0], cy);
-    ctx.fillStyle=isNew?'#ffe600':'#ffffff'; ctx.font=`${isNew?'bold ':''}13px monospace`;
-    ctx.fillText(s.name.substring(0,14), cols[1], cy);
-    ctx.fillStyle=rankColor; ctx.font='bold 13px monospace';
-    ctx.fillText(s.score.toLocaleString(), cols[2], cy);
-    ctx.fillStyle='#aaccff'; ctx.font='11px monospace';
-    ctx.fillText(s.diff, cols[3], cy);
-    ctx.restore();
-  });
 }
 
 function drawRankingTitle(text, x, y, fontSize=58, saturation=NEON_UI_SATURATION) {
@@ -846,7 +671,7 @@ function drawRankBadge(rank, x, y) {
   ctx.beginPath();
   for (let i = 0; i < 8; i++) {
     const a = -Math.PI / 2 + i * Math.PI / 4;
-    const r = i % 2 === 0 ? 18 : 14;
+    const r = i % 2 === 0 ? 16 : 12;
     const px = Math.cos(a) * r;
     const py = Math.sin(a) * r;
     if (i === 0) ctx.moveTo(px, py);
@@ -857,7 +682,7 @@ function drawRankBadge(rank, x, y) {
   ctx.stroke();
   ctx.shadowBlur = 0;
   ctx.fillStyle = '#171421';
-  ctx.font = '900 20px monospace';
+  ctx.font = '900 18px monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText(String(rank), 0, 0);
@@ -866,7 +691,7 @@ function drawRankBadge(rank, x, y) {
 }
 
 function drawPixelScoreTable(scores, tableTop, maxRows=8) {
-  const pad = 26, rowH = 50, headerH = 46, tableW = W - pad * 2;
+  const pad = 26, rowH = 46, headerH = 42, tableW = W - pad * 2;
   const tableH = headerH + rowH * maxRows;
   const tableX = pad;
   const cols = [tableX + 28, tableX + 96, tableX + 258, tableX + 360];
@@ -874,7 +699,7 @@ function drawPixelScoreTable(scores, tableTop, maxRows=8) {
   const bottom = tableTop + tableH;
 
   ctx.save();
-  ctx.filter = `saturate(${NEON_UI_SATURATION})`;
+  ctx.filter = `saturate(${PANEL_NEON_SATURATION})`;
   ctx.shadowColor = 'rgba(168,56,255,0.45)';
   ctx.shadowBlur = 18;
   ctx.fillStyle = 'rgba(2,4,15,0.72)';
@@ -910,7 +735,7 @@ function drawPixelScoreTable(scores, tableTop, maxRows=8) {
   }
   ctx.setLineDash([]);
 
-  ctx.font = '900 16px monospace';
+  ctx.font = '900 15px monospace';
   ctx.textBaseline = 'middle';
   ctx.textAlign = 'left';
   [
@@ -929,7 +754,7 @@ function drawPixelScoreTable(scores, tableTop, maxRows=8) {
   if (scores.length === 0) {
     ctx.textAlign = 'center';
     ctx.fillStyle = '#bfc7ff';
-    ctx.font = 'bold 16px monospace';
+    ctx.font = 'bold 15px monospace';
     ctx.fillText('aun no hay puntajes', W / 2, tableTop + headerH + rowH * 2);
     ctx.restore();
     return;
@@ -956,7 +781,7 @@ function drawPixelScoreTable(scores, tableTop, maxRows=8) {
     if (!drawRankBadge(rank, cols[0] + 5, cy)) {
       ctx.shadowColor = rankColor; ctx.shadowBlur = 8;
       ctx.fillStyle = rankColor;
-      ctx.font = '900 18px monospace';
+      ctx.font = '900 16px monospace';
       ctx.fillText(String(rank), cols[0], cy);
       ctx.shadowBlur = 0;
     }
@@ -964,19 +789,19 @@ function drawPixelScoreTable(scores, tableTop, maxRows=8) {
     ctx.fillStyle = isNew ? '#fff5a8' : '#ffffff';
     ctx.shadowColor = isNew ? 'rgba(255,210,29,0.75)' : 'rgba(255,255,255,0.28)';
     ctx.shadowBlur = isNew ? 10 : 5;
-    ctx.font = `${isNew ? '900' : '700'} 16px monospace`;
+    ctx.font = `${isNew ? '900' : '700'} 15px monospace`;
     ctx.fillText(s.name.substring(0, 12), cols[1], cy);
 
     ctx.fillStyle = '#ffd21d';
     ctx.shadowColor = 'rgba(255,210,29,0.75)';
     ctx.shadowBlur = 10;
-    ctx.font = '900 16px monospace';
+    ctx.font = '900 15px monospace';
     ctx.fillText(s.score.toLocaleString(), cols[2], cy);
 
     ctx.fillStyle = '#35cfff';
     ctx.shadowColor = 'rgba(53,207,255,0.60)';
     ctx.shadowBlur = 8;
-    ctx.font = '700 13px monospace';
+    ctx.font = '700 12px monospace';
     ctx.fillText(s.diff.substring(0, 18), cols[3], cy);
     ctx.shadowBlur = 0;
   });
@@ -985,7 +810,7 @@ function drawPixelScoreTable(scores, tableTop, maxRows=8) {
 
 function drawLeaderboard() {
   drawMenuBg();
-  drawRankingTitle('RANKING', W/2, 76, 52);
+  drawRankingTitle('RANKING', W/2, 76, 34);
   if (!leaderboardRefreshing) {
     leaderboardRefreshing = true;
     fetchScoresFromSupabase().finally(() => { leaderboardRefreshing = false; });
@@ -1010,7 +835,7 @@ function drawPixelCredits() {
   const r = 15;
 
   ctx.save();
-  ctx.filter = `saturate(${NEON_UI_SATURATION})`;
+  ctx.filter = `saturate(${PANEL_NEON_SATURATION})`;
   ctx.shadowColor = 'rgba(255,55,244,0.45)';
   ctx.shadowBlur = 14;
   ctx.fillStyle = 'rgba(2,4,15,0.78)';
@@ -1101,54 +926,6 @@ function drawPixelCredits() {
 
 function drawCredits() {
   drawPixelCredits();
-  return;
-  drawMenuBg();
-  drawRankingTitle('TETRIS PIBAL', W/2, 72, 36);
-
-  const panW = 340, panH = 330, panX = W/2 - panW/2, panY = 140;
-  drawWarmPanel(panX, panY, panW, panH);
-
-  const lines = [
-    { text: 'CREADO POR',          style: 'label' },
-    { text: 'Turcovein',           style: 'name'  },
-    { text: '',                    style: 'gap'   },
-    { text: 'DESARROLLADO CON',    style: 'label' },
-    { text: 'Claude (Anthropic)',  style: 'value' },
-    { text: '',                    style: 'gap'   },
-    { text: 'ASSETS',              style: 'label' },
-    { text: 'Imágenes y videos',   style: 'value' },
-    { text: 'por Turcovein',       style: 'value' },
-    { text: '',                    style: 'gap'   },
-    { text: '¡Gracias pibe por jugar!', style: 'thanks'},
-  ];
-
-  let y = panY + 44;
-  for (const { text, style } of lines) {
-    if (style === 'gap') { y += 10; continue; }
-    ctx.save();
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    if (style === 'label') {
-      ctx.font = 'bold 11px monospace'; ctx.fillStyle = '#8888cc';
-    } else if (style === 'name') {
-      ctx.font = 'bold 28px monospace'; ctx.fillStyle = '#ffe600';
-      ctx.shadowColor = 'rgba(255,200,0,0.6)'; ctx.shadowBlur = 14;
-    } else if (style === 'value') {
-      ctx.font = '15px monospace'; ctx.fillStyle = '#c8d8ff';
-    } else if (style === 'thanks') {
-      ctx.font = 'bold 15px monospace'; ctx.fillStyle = '#88ffcc';
-      ctx.shadowColor = 'rgba(100,255,180,0.5)'; ctx.shadowBlur = 10;
-    }
-    ctx.fillText(text, W/2, y);
-    ctx.restore();
-    y += style === 'name' ? 40 : style === 'label' ? 22 : 26;
-  }
-
-  menuPulse += 0.04;
-  ctx.save();
-  ctx.globalAlpha = 0.5 + 0.5 * Math.sin(menuPulse);
-  drawHint('ENTER / ESC para volver', H - 28);
-  ctx.restore();
-  drawMuteIndicator();
 }
 function startIntroMusic() {
   if (menuUnlocked) return;

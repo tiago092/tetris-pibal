@@ -1,0 +1,2 @@
+-- Local development seed intentionally empty.
+-- Add fake scores here if you want `supabase db reset` to preload a ranking.

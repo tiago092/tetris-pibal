@@ -98,7 +98,7 @@ function onGameEnd(score, won) {
   setTimeout(() => {
     const s = loadScores();
     s.forEach(x => delete x._new);
-    localStorage.setItem('tetrispibal_scores', JSON.stringify(s));
+    localStorage.setItem(SCORES_STORAGE_KEY, JSON.stringify(s));
   }, 5000);
   return entry;
 }

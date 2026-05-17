@@ -1,15 +1,94 @@
 // ---- Leaderboard / Supabase ----
-const SUPA_URL = 'https://ucnaukurijvlmxgofhmv.supabase.co/rest/v1';
-const SUPA_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVjbmF1a3VyaWp2bG14Z29maG12Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg3MzgxMDQsImV4cCI6MjA5NDMxNDEwNH0.IZmwY81Gm_zRYWiuw0-1eTAcIh0h7-q4W5ZIDAuFml0';
+// La anon key es publica en clientes web. La validacion de abajo mejora el
+// cliente, pero la proteccion real contra abuso debe vivir en RLS/rate limits.
+const SUPA_CONFIG = window.TETRIS_PIBAL_SUPABASE || {};
+const SUPA_BASE_URL = String(SUPA_CONFIG.url || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
+const SUPA_URL = SUPA_BASE_URL ? `${SUPA_BASE_URL}/rest/v1` : '';
+const SUPA_KEY = String(SUPA_CONFIG.anonKey || '');
 
 let cachedScores = null;
 let scoresLastFetch = 0;
 let scoresFetchPromise = null;
 let playerLocationPromise = null;
 const SCORES_REFRESH_MS = 60000;
+const SCORE_SUBMIT_COOLDOWN_MS = 30000;
+const SCORES_STORAGE_KEY = 'tetrispibal_scores';
+const SCORE_SUBMIT_STORAGE_KEY = 'tetrispibal_last_remote_score_submit';
 
 function getDeviceType() {
   return matchMedia('(pointer: coarse)').matches ? 'touch' : 'desktop';
+}
+
+function sanitizeText(value, maxLength) {
+  return String(value ?? '')
+    .replace(/[\x00-\x1f\x7f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, maxLength);
+}
+
+function normalizeDifficulty(diff) {
+  const value = sanitizeText(diff, 40);
+  if (!value) return '';
+  const match = DIFFICULTIES.find(d => d.name === value || d.short === value);
+  return match ? value : '';
+}
+
+function normalizeScoreEntry(raw, { allowMissingDate=false }={}) {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const name = sanitizeText(raw.name, 16);
+  const score = Number(raw.score);
+  const level = Number(raw.level);
+  const diff = normalizeDifficulty(raw.diff);
+  if (!name || !Number.isInteger(score) || score < 0) return null;
+  if (!diff || !Number.isInteger(level) || level < 1 || level > LEVELS.length) return null;
+
+  const entry = {
+    name,
+    score,
+    diff,
+    level,
+    won: raw.won === true,
+    country: sanitizeText(raw.country, 40),
+    city: sanitizeText(raw.city, 60),
+    date: sanitizeText(raw.date, 20)
+  };
+
+  if (raw._new === true) entry._new = true;
+  if (!entry.date && !allowMissingDate) entry.date = new Date().toLocaleDateString();
+  return entry;
+}
+
+function normalizeRemoteScore(row) {
+  if (!row || typeof row !== 'object') return null;
+  const createdAt = row.created_at ? new Date(row.created_at) : null;
+  return normalizeScoreEntry({
+    name: row.name,
+    score: row.score,
+    diff: row.diff,
+    level: row.level,
+    won: row.won,
+    country: row.country,
+    city: row.city,
+    date: createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt.toLocaleDateString() : ''
+  }, { allowMissingDate: true });
+}
+
+function sortScores(scores) {
+  return scores
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 10);
+}
+
+function canSubmitRemoteScore() {
+  const last = Number(localStorage.getItem(SCORE_SUBMIT_STORAGE_KEY) || 0);
+  return !last || Date.now() - last >= SCORE_SUBMIT_COOLDOWN_MS;
+}
+
+function markRemoteScoreSubmit() {
+  localStorage.setItem(SCORE_SUBMIT_STORAGE_KEY, String(Date.now()));
 }
 
 async function fetchPlayerLocationByIp() {
@@ -37,6 +116,7 @@ function getPlayerLocationInfo() {
 }
 
 async function fetchScoresFromSupabase() {
+  if (!SUPA_URL || !SUPA_KEY) return null;
   if (scoresFetchPromise) return scoresFetchPromise;
   const now = Date.now();
   if (cachedScores && now - scoresLastFetch < SCORES_REFRESH_MS) return cachedScores;
@@ -49,15 +129,10 @@ async function fetchScoresFromSupabase() {
       return res.json();
     })
     .then(data => {
-      const scores = data.map(r => ({
-        name: r.name, score: r.score, diff: r.diff || '',
-        level: r.level || 1, won: r.won || false,
-        country: r.country || '', city: r.city || '',
-        date: r.created_at ? new Date(r.created_at).toLocaleDateString() : ''
-      }));
+      const scores = sortScores(Array.isArray(data) ? data.map(normalizeRemoteScore) : []);
       cachedScores = scores;
       scoresLastFetch = Date.now();
-      localStorage.setItem('tetrispibal_scores', JSON.stringify(scores));
+      localStorage.setItem(SCORES_STORAGE_KEY, JSON.stringify(scores));
       return scores;
     })
     .catch(() => null)
@@ -72,11 +147,17 @@ function refreshScoresFromSupabase() {
 }
 
 function loadScores() {
-  try { return JSON.parse(localStorage.getItem('tetrispibal_scores') || '[]'); }
+  try {
+    const raw = JSON.parse(localStorage.getItem(SCORES_STORAGE_KEY) || '[]');
+    return sortScores((Array.isArray(raw) ? raw : []).map(item => normalizeScoreEntry(item, { allowMissingDate: true })));
+  }
   catch { return []; }
 }
 
 async function saveScoreToSupabase(entry) {
+  if (!SUPA_URL || !SUPA_KEY) return;
+  if (!canSubmitRemoteScore()) return;
+  markRemoteScoreSubmit();
   try {
     const location = await getPlayerLocationInfo();
     await fetch(`${SUPA_URL}/scores`, {
@@ -101,9 +182,12 @@ async function saveScoreToSupabase(entry) {
 }
 
 function saveScore(entry) {
+  const normalized = normalizeScoreEntry(entry);
+  if (!normalized) return null;
   const scores = loadScores();
-  scores.push(entry);
-  scores.sort((a,b) => b.score - a.score);
-  localStorage.setItem('tetrispibal_scores', JSON.stringify(scores.slice(0, 10)));
-  saveScoreToSupabase(entry);
+  scores.push(normalized);
+  const topScores = sortScores(scores);
+  localStorage.setItem(SCORES_STORAGE_KEY, JSON.stringify(topScores));
+  saveScoreToSupabase(normalized);
+  return normalized;
 }

@@ -168,7 +168,7 @@ function handleGameTap(x, y) {
   if (inMenu) {
     if (!menuUnlocked) { startMenuAudio(); return; }
     for (let i = 0; i < MENU_OPTIONS.length; i++) {
-      const cy = H * 0.47 + i * 62;
+      const cy = H * MENU_CONFIG.optionsStartY + i * MENU_CONFIG.optionsGap;
       if (Math.abs(y - cy) <= 30) {
         menuOption = i;
         selectMenuOption();

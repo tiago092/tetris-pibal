@@ -1,13 +1,15 @@
 // ============================================================
 //  TETRIS PIBAL — Configuración de assets y niveles
 //  Editá este archivo para cambiar fondos, música y dificultad
-//  sin tocar la lógica del juego (tetris.js).
+//  sin tocar la lógica del juego (js/game.js).
 // ============================================================
 
 // ---- Menú principal ----
 const MENU_CONFIG = {
   bg:    'assets/img/achitiago-pixel.png',
   music: 'assets/sound/intro.mp3',
+  optionsStartY: 0.51,
+  optionsGap: 62,
 };
 
 // ---- Pantalla de victoria ----

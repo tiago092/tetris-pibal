@@ -3,7 +3,20 @@
   "version": "1.0.0",
   "private": true,
   "description": "Tetris Pibal web app.",
+  "scripts": {
+    "check:syntax": "node scripts/check-syntax.js",
+    "smoke": "node scripts/smoke.js",
+    "test": "npm run check:syntax && npm run smoke",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:reset": "supabase db reset",
+    "supabase:login": "supabase login",
+    "supabase:link": "node scripts/link-supabase.js",
+    "supabase:push": "supabase db push",
+    "supabase:config": "node scripts/write-supabase-config.js"
+  },
   "devDependencies": {
-    "playwright": "^1.60.0"
+    "playwright": "^1.60.0",
+    "supabase": "^2.98.2"
   }
 }
