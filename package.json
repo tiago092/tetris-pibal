@@ -13,8 +13,7 @@
     "supabase:reset": "supabase db reset",
     "supabase:login": "supabase login",
     "supabase:link": "node scripts/link-supabase.js",
-    "supabase:push": "supabase db push",
-    "supabase:config": "node scripts/write-supabase-config.js"
+    "supabase:push": "supabase db push"
   },
   "devDependencies": {
     "playwright": "^1.60.0",

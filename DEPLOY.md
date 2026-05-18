@@ -15,8 +15,6 @@ In the Supabase Dashboard:
 2. Copy:
    - `Project URL`
    - `anon public key`
-   - `Project ref`
-   - database password
 
 Create the table and policies:
 
@@ -41,22 +39,11 @@ For local builds, copy `.env.example` to `.env` and fill it in:
 ```txt
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_ANON_KEY=your-public-anon-key
-SUPABASE_PROJECT_REF=your-project-ref
-SUPABASE_DB_PASSWORD=your-db-password
 ```
-
-Generate the public config:
-
-```powershell
-npm run supabase:config
-```
-
-This updates `js/supabase-config.js`.
 
 `.env` is only for your machine and must stay ignored by git. The browser never
 loads `.env` directly. The build step converts `SUPABASE_URL` and
-`SUPABASE_ANON_KEY` into the public file `js/supabase-config.js`, which is then
-copied into `dist/`.
+`SUPABASE_ANON_KEY` into the public file `dist/js/supabase-config.js`.
 
 ## 3. Verify
 
@@ -99,7 +86,7 @@ GitHub path:
 6. Push to your deploy branch (`master` in this local repo).
 
 Do not add `.env` to git. GitHub Actions reads the secrets and generates
-`js/supabase-config.js` during `npm run build`.
+`dist/js/supabase-config.js` during `npm run build`.
 
 ## 6. Other static hosting
 
@@ -128,8 +115,8 @@ After deploy:
 
 ## Important
 
-Do not upload `.env`. Only `js/supabase-config.js` is published, and it contains
-public data required by the web app.
+Do not upload `.env`. Only `dist/js/supabase-config.js` is published, and it
+contains public data required by the web app.
 
 The anon key is public in a web app. That is fine while RLS is enabled and the
 policies match the versioned SQL.
