@@ -92,8 +92,9 @@ function createState() {
 }
 
 function onGameEnd(score, won) {
+  const finalLevel = Math.max(1, Math.min(state.level + 1, LEVELS.length));
   const entry = { name: playerName, score, diff: currentDiff.name,
-                  level: state.level+1, won, date: new Date().toLocaleDateString(), _new: true };
+                  level: finalLevel, won, date: new Date().toLocaleDateString(), _new: true };
   saveScore(entry);
   if (!isSupabaseLeaderboardEnabled()) {
     setTimeout(() => {
