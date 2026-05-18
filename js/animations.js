@@ -328,9 +328,12 @@ function startGameOverAnim(board, score, stats, onRestart, onQuit) {
       // centrar el video manteniendo un tamaño razonable
       const vw = BW + 60, vh = BH + 20;
       const vx = W/2 - vw/2, vy = BY - 10;
+      ctx.save();
+      ctx.filter = 'brightness(1.24) contrast(1.06) saturate(1.08)';
       ctx.drawImage(gameOverVideo, vx, vy, vw, vh);
+      ctx.restore();
     }
-    ctx.fillStyle=`rgba(0,0,0,${Math.min(0.55,elapsed/3000)})`; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle=`rgba(0,0,0,${Math.min(0.35,elapsed/3600)})`; ctx.fillRect(0,0,W,H);
     for (const fb of falling) { fb.update(); fb.draw(ctx); }
     if (elapsed>700) {
       const cx=W/2, cy=H*0.52;
