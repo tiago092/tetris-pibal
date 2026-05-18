@@ -112,6 +112,7 @@ function selectMenuOption() {
     nameInput.style.display = 'block'; nameInput.focus();
   } else if (menuOption === 1) {
     inMenu = false; inLeaderboard = true; menuPulse = 0;
+    refreshScoresFromSupabase();
   } else if (menuOption === 2) {
     inMenu = false; inCredits = true; menuPulse = 0;
     levelupSound.currentTime = 0; levelupSound.play().catch(() => {});

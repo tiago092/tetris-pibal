@@ -5,12 +5,15 @@ const SUPA_CONFIG = window.TETRIS_PIBAL_SUPABASE || {};
 const SUPA_BASE_URL = String(SUPA_CONFIG.url || '').replace(/\/rest\/v1\/?$/, '').replace(/\/$/, '');
 const SUPA_URL = SUPA_BASE_URL ? `${SUPA_BASE_URL}/rest/v1` : '';
 const SUPA_KEY = String(SUPA_CONFIG.anonKey || '');
+const SUPA_ENABLED = !!(SUPA_URL && SUPA_KEY);
 
 let cachedScores = null;
 let scoresLastFetch = 0;
 let scoresFetchPromise = null;
+let scoresFetchFailed = false;
 let playerLocationPromise = null;
 const SCORES_REFRESH_MS = 60000;
+const SCORES_RETRY_MS = 10000;
 const SCORE_SUBMIT_COOLDOWN_MS = 30000;
 const SCORES_STORAGE_KEY = 'tetrispibal_scores';
 const SCORE_SUBMIT_STORAGE_KEY = 'tetrispibal_last_remote_score_submit';
@@ -91,6 +94,10 @@ function markRemoteScoreSubmit() {
   localStorage.setItem(SCORE_SUBMIT_STORAGE_KEY, String(Date.now()));
 }
 
+function isSupabaseLeaderboardEnabled() {
+  return SUPA_ENABLED;
+}
+
 async function fetchPlayerLocationByIp() {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 3500);
@@ -116,13 +123,19 @@ function getPlayerLocationInfo() {
 }
 
 async function fetchScoresFromSupabase() {
-  if (!SUPA_URL || !SUPA_KEY) return null;
+  if (!SUPA_ENABLED) return null;
   if (scoresFetchPromise) return scoresFetchPromise;
   const now = Date.now();
   if (cachedScores && now - scoresLastFetch < SCORES_REFRESH_MS) return cachedScores;
+  if (scoresFetchFailed && now - scoresLastFetch < SCORES_RETRY_MS) return null;
 
-  scoresFetchPromise = fetch(`${SUPA_URL}/scores?order=score.desc&limit=10`, {
-    headers: { 'apikey': SUPA_KEY, 'Authorization': `Bearer ${SUPA_KEY}` }
+  const query = 'select=name,score,diff,level,won,country,city,created_at&order=score.desc,created_at.asc&limit=10';
+  scoresFetchPromise = fetch(`${SUPA_URL}/scores?${query}`, {
+    cache: 'no-store',
+    headers: {
+      'apikey': SUPA_KEY,
+      'Authorization': `Bearer ${SUPA_KEY}`
+    }
   })
     .then(res => {
       if (!res.ok) throw new Error('fetch failed');
@@ -132,10 +145,15 @@ async function fetchScoresFromSupabase() {
       const scores = sortScores(Array.isArray(data) ? data.map(normalizeRemoteScore) : []);
       cachedScores = scores;
       scoresLastFetch = Date.now();
+      scoresFetchFailed = false;
       localStorage.setItem(SCORES_STORAGE_KEY, JSON.stringify(scores));
       return scores;
     })
-    .catch(() => null)
+    .catch(() => {
+      scoresFetchFailed = true;
+      scoresLastFetch = Date.now();
+      return null;
+    })
     .finally(() => { scoresFetchPromise = null; });
 
   return scoresFetchPromise;
@@ -146,7 +164,7 @@ function refreshScoresFromSupabase() {
   return fetchScoresFromSupabase();
 }
 
-function loadScores() {
+function loadLocalScores() {
   try {
     const raw = JSON.parse(localStorage.getItem(SCORES_STORAGE_KEY) || '[]');
     return sortScores((Array.isArray(raw) ? raw : []).map(item => normalizeScoreEntry(item, { allowMissingDate: true })));
@@ -154,13 +172,26 @@ function loadScores() {
   catch { return []; }
 }
 
+function loadScores() {
+  if (!SUPA_ENABLED) return loadLocalScores();
+  return cachedScores ? cachedScores : [];
+}
+
+function getLeaderboardStatus() {
+  if (!SUPA_ENABLED) return 'local';
+  if (scoresFetchPromise && !cachedScores) return 'loading';
+  if (scoresFetchFailed && !cachedScores) return 'error';
+  if (scoresFetchFailed && cachedScores) return 'stale';
+  if (cachedScores) return 'online';
+  return 'loading';
+}
+
 async function saveScoreToSupabase(entry) {
-  if (!SUPA_URL || !SUPA_KEY) return;
-  if (!canSubmitRemoteScore()) return;
-  markRemoteScoreSubmit();
+  if (!SUPA_ENABLED) return false;
+  if (!canSubmitRemoteScore()) return false;
   try {
     const location = await getPlayerLocationInfo();
-    await fetch(`${SUPA_URL}/scores`, {
+    const res = await fetch(`${SUPA_URL}/scores`, {
       method: 'POST',
       headers: {
         'apikey': SUPA_KEY,
@@ -176,18 +207,30 @@ async function saveScoreToSupabase(entry) {
         device: getDeviceType()
       })
     });
+    if (!res.ok) throw new Error('insert failed');
+    markRemoteScoreSubmit();
     cachedScores = null;
     scoresLastFetch = 0;
-  } catch { /* falla silenciosamente */ }
+    scoresFetchFailed = false;
+    refreshScoresFromSupabase();
+    return true;
+  } catch {
+    scoresFetchFailed = true;
+    scoresLastFetch = Date.now();
+    return false;
+  }
 }
 
 function saveScore(entry) {
   const normalized = normalizeScoreEntry(entry);
   if (!normalized) return null;
-  const scores = loadScores();
+  if (SUPA_ENABLED) {
+    saveScoreToSupabase(normalized);
+    return normalized;
+  }
+  const scores = loadLocalScores();
   scores.push(normalized);
   const topScores = sortScores(scores);
   localStorage.setItem(SCORES_STORAGE_KEY, JSON.stringify(topScores));
-  saveScoreToSupabase(normalized);
   return normalized;
 }

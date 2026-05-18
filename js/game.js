@@ -95,11 +95,13 @@ function onGameEnd(score, won) {
   const entry = { name: playerName, score, diff: currentDiff.name,
                   level: state.level+1, won, date: new Date().toLocaleDateString(), _new: true };
   saveScore(entry);
-  setTimeout(() => {
-    const s = loadScores();
-    s.forEach(x => delete x._new);
-    localStorage.setItem(SCORES_STORAGE_KEY, JSON.stringify(s));
-  }, 5000);
+  if (!isSupabaseLeaderboardEnabled()) {
+    setTimeout(() => {
+      const s = loadScores();
+      s.forEach(x => delete x._new);
+      localStorage.setItem(SCORES_STORAGE_KEY, JSON.stringify(s));
+    }, 5000);
+  }
   return entry;
 }
 

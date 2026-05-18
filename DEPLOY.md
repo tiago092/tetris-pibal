@@ -36,7 +36,7 @@ That SQL:
 
 ## 2. Connect the game
 
-Copy `.env.example` to `.env` and fill it in:
+For local builds, copy `.env.example` to `.env` and fill it in:
 
 ```txt
 SUPABASE_URL=https://your-project-ref.supabase.co
@@ -52,6 +52,11 @@ npm run supabase:config
 ```
 
 This updates `js/supabase-config.js`.
+
+`.env` is only for your machine and must stay ignored by git. The browser never
+loads `.env` directly. The build step converts `SUPABASE_URL` and
+`SUPABASE_ANON_KEY` into the public file `js/supabase-config.js`, which is then
+copied into `dist/`.
 
 ## 3. Verify
 
@@ -73,11 +78,33 @@ This creates `dist/` with:
 - `assets/`
 - `js/`
 
-## 5. Upload to static hosting
+## 5. Deploy to GitHub Pages
+
+This repo includes `.github/workflows/pages.yml`. On every push to `main` or
+`master`, GitHub Actions runs the tests, builds `dist/`, and deploys it to
+GitHub Pages.
+
+Add these repository secrets in GitHub:
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+
+GitHub path:
+
+1. Open the repo on GitHub.
+2. Go to `Settings` -> `Secrets and variables` -> `Actions`.
+3. Add both secrets.
+4. Go to `Settings` -> `Pages`.
+5. Set `Source` to `GitHub Actions`.
+6. Push to your deploy branch (`master` in this local repo).
+
+Do not add `.env` to git. GitHub Actions reads the secrets and generates
+`js/supabase-config.js` during `npm run build`.
+
+## 6. Other static hosting
 
 Upload the contents of `dist/` to any static host:
 
-- GitHub Pages
 - Netlify
 - Vercel
 - Cloudflare Pages
@@ -90,7 +117,7 @@ Hosting settings:
 - Publish/output directory: `dist`
 - Node version: `24`
 
-## 6. Manual smoke test
+## 7. Manual smoke test
 
 After deploy:
 

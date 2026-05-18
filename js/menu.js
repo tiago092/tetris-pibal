@@ -811,11 +811,30 @@ function drawPixelScoreTable(scores, tableTop, maxRows=8) {
 function drawLeaderboard() {
   drawMenuBg();
   drawRankingTitle('RANKING', W/2, 76, 34);
-  if (!leaderboardRefreshing) {
+  const status = getLeaderboardStatus();
+  if (isSupabaseLeaderboardEnabled() && !leaderboardRefreshing && (status === 'loading' || status === 'error')) {
     leaderboardRefreshing = true;
     fetchScoresFromSupabase().finally(() => { leaderboardRefreshing = false; });
   }
   drawPixelScoreTable(loadScores(), 142, 8);
+  const statusText = {
+    local: 'ranking local',
+    loading: 'cargando ranking online...',
+    error: 'no se pudo cargar Supabase',
+    stale: 'mostrando ultima carga online',
+    online: ''
+  }[status] || '';
+  if (statusText) {
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = 'bold 13px monospace';
+    ctx.fillStyle = status === 'error' ? '#ff9a9a' : '#bfc7ff';
+    ctx.shadowColor = status === 'error' ? 'rgba(255,70,70,0.6)' : 'rgba(100,140,255,0.55)';
+    ctx.shadowBlur = 8;
+    ctx.fillText(statusText, W/2, 120);
+    ctx.restore();
+  }
   menuPulse += 0.04;
   ctx.save();
   ctx.globalAlpha = 0.5 + 0.5*Math.sin(menuPulse);
