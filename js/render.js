@@ -348,57 +348,60 @@ class ComboText {
     const pop = age < 0.18 ? age / 0.18 : 1;
     const fade = this.life < 0.24 ? this.life / 0.24 : 1;
     const bounce = 1 + Math.sin(pop * Math.PI) * 0.18;
-    const lift = age * 12;
-    const cx = BX + BW / 2;
-    const cy = BY + 34 - lift;
-    const w = 220;
-    const h = 46;
-
-    ctx.save();
-    ctx.globalAlpha = Math.max(0, fade);
-    ctx.textAlign='center'; ctx.textBaseline='middle';
-    ctx.translate(cx, cy);
-    ctx.scale(bounce, bounce);
-
-    const panel = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
-    panel.addColorStop(0, 'rgba(255,255,255,0.22)');
-    panel.addColorStop(0.18, 'rgba(20,20,35,0.92)');
-    panel.addColorStop(1, 'rgba(0,0,0,0.78)');
-
-    ctx.shadowColor = this.color;
-    ctx.shadowBlur = 20;
-    ctx.fillStyle = panel;
-    ctx.beginPath();
-    ctx.roundRect(-w / 2, -h / 2, w, h, 9);
-    ctx.fill();
-
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = this.color;
-    ctx.stroke();
-
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(-w / 2 + 5, -h / 2 + 5, w - 10, h - 10, 6);
-    ctx.stroke();
-
-    ctx.font = '900 28px Arial Black, Impact, sans-serif';
-    ctx.lineJoin = 'round';
-    ctx.shadowColor = this.color;
-    ctx.shadowBlur = 14;
-    ctx.strokeStyle = 'rgba(0,0,0,0.92)';
-    ctx.lineWidth = 5;
-    ctx.strokeText(this.text, 0, 1);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(this.text, 0, 1);
-
-    ctx.globalAlpha *= 0.45;
-    ctx.fillStyle = this.color;
-    ctx.fillRect(-w / 2 + 12, -h / 2 + 8, w - 24, 3);
-    ctx.fillRect(-w / 2 + 12, h / 2 - 11, w - 24, 2);
-    ctx.restore();
+    const lift = age * 14;
+    drawComboBadge(this.text, this.color, BY + 78 - lift, bounce, Math.max(0, fade));
   }
+}
+
+function drawComboBadge(text, color, y, scale=1, alpha=1) {
+  const w = 218;
+  const h = 44;
+  const cx = BX + BW / 2;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.translate(cx, y);
+  ctx.scale(scale, scale);
+
+  const panel = ctx.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+  panel.addColorStop(0, 'rgba(255,255,255,0.22)');
+  panel.addColorStop(0.18, 'rgba(20,20,35,0.94)');
+  panel.addColorStop(1, 'rgba(0,0,0,0.80)');
+
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 20;
+  ctx.fillStyle = panel;
+  ctx.beginPath();
+  ctx.roundRect(-w / 2, -h / 2, w, h, 9);
+  ctx.fill();
+
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = color;
+  ctx.stroke();
+
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(-w / 2 + 5, -h / 2 + 5, w - 10, h - 10, 6);
+  ctx.stroke();
+
+  ctx.font = '900 27px Arial Black, Impact, sans-serif';
+  ctx.lineJoin = 'round';
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 14;
+  ctx.strokeStyle = 'rgba(0,0,0,0.92)';
+  ctx.lineWidth = 5;
+  ctx.strokeText(text, 0, 1);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(text, 0, 1);
+
+  ctx.globalAlpha *= 0.45;
+  ctx.fillStyle = color;
+  ctx.fillRect(-w / 2 + 12, -h / 2 + 8, w - 24, 3);
+  ctx.fillRect(-w / 2 + 12, h / 2 - 11, w - 24, 2);
+  ctx.restore();
 }
 
 function drawHUD(score, level, lines, nextPiece, theme) {
@@ -552,20 +555,10 @@ function drawGame(state) {
 
   for (const p of particles) p.draw(ctx);
 
-  // combo fijo anterior desactivado; el popup animado se dibuja arriba.
-  if (false && state.combo >= 2) {
+  if (state.combo >= 2) {
     const color = COMBO_COLORS[Math.min(state.combo, 4)] || '#ffffff';
     const pulse = 1 + 0.08 * Math.sin(performance.now() / 120);
-    const sz = Math.round(22 * pulse);
-    ctx.save();
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.font = `bold ${sz}px monospace`;
-    ctx.shadowColor = color; ctx.shadowBlur = 18;
-    ctx.strokeStyle = 'rgba(0,0,0,0.8)'; ctx.lineWidth = 4; ctx.lineJoin = 'round';
-    ctx.strokeText(`${state.combo}× COMBO`, BX + BW / 2, BY + BH - 28);
-    ctx.fillStyle = color;
-    ctx.fillText(`${state.combo}× COMBO`, BX + BW / 2, BY + BH - 28);
-    ctx.restore();
+    drawComboBadge(`${state.combo}x COMBO`, color, BY + 78, pulse, 0.94);
   }
 
   for (const ct of comboTexts) ct.draw(ctx);
