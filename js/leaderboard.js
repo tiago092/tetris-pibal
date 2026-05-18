@@ -85,6 +85,20 @@ function sortScores(scores) {
     .slice(0, 10);
 }
 
+function scoreNameKey(name) {
+  return sanitizeText(name, 16).toLocaleLowerCase();
+}
+
+function dedupeScoresByName(scores) {
+  const bestByName = new Map();
+  scores.filter(Boolean).forEach(score => {
+    const key = scoreNameKey(score.name);
+    const prev = bestByName.get(key);
+    if (!prev || score.score > prev.score) bestByName.set(key, score);
+  });
+  return sortScores(Array.from(bestByName.values()));
+}
+
 function isSupabaseLeaderboardEnabled() {
   return SUPA_ENABLED;
 }
@@ -145,7 +159,7 @@ async function fetchScoresFromSupabase() {
       return res.json();
     })
     .then(data => {
-      const scores = sortScores(Array.isArray(data) ? data.map(normalizeRemoteScore) : []);
+      const scores = dedupeScoresByName(Array.isArray(data) ? data.map(normalizeRemoteScore) : []);
       cachedScores = scores;
       scoresLastFetch = Date.now();
       scoresFetchFailed = false;
@@ -171,7 +185,7 @@ function refreshScoresFromSupabase() {
 function loadLocalScores() {
   try {
     const raw = JSON.parse(localStorage.getItem(SCORES_STORAGE_KEY) || '[]');
-    return sortScores((Array.isArray(raw) ? raw : []).map(item => normalizeScoreEntry(item, { allowMissingDate: true })));
+    return dedupeScoresByName((Array.isArray(raw) ? raw : []).map(item => normalizeScoreEntry(item, { allowMissingDate: true })));
   }
   catch { return []; }
 }
@@ -210,6 +224,13 @@ async function saveScoreToSupabase(entry) {
   lastScoreSubmitStatus = 'saving';
   try {
     const location = await getPlayerLocationInfoQuickly();
+    const payload = {
+      name: entry.name, score: entry.score, diff: entry.diff,
+      level: entry.level, won: entry.won,
+      country: entry.country || location.country || '',
+      city: entry.city || location.city || '',
+      device: getDeviceType()
+    };
     const res = await fetch(`${SUPA_URL}/scores`, {
       method: 'POST',
       headers: {
@@ -218,15 +239,25 @@ async function saveScoreToSupabase(entry) {
         'Content-Type': 'application/json',
         'Prefer': 'return=minimal'
       },
-      body: JSON.stringify({
-        name: entry.name, score: entry.score, diff: entry.diff,
-        level: entry.level, won: entry.won,
-        country: entry.country || location.country || '',
-        city: entry.city || location.city || '',
-        device: getDeviceType()
-      })
+      body: JSON.stringify(payload)
     });
-    if (!res.ok) {
+    if (res.status === 409) {
+      const key = encodeURIComponent(scoreNameKey(entry.name));
+      const betterScoreRes = await fetch(`${SUPA_URL}/scores?name_key=eq.${key}&score=lt.${entry.score}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SUPA_KEY,
+          'Authorization': `Bearer ${SUPA_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify(payload)
+      });
+      if (!betterScoreRes.ok) {
+        const detail = await betterScoreRes.text().catch(() => '');
+        throw new Error(`Supabase rechazo actualizar el puntaje (${betterScoreRes.status}): ${detail || betterScoreRes.statusText}`);
+      }
+    } else if (!res.ok) {
       const detail = await res.text().catch(() => '');
       throw new Error(`Supabase rechazo el puntaje (${res.status}): ${detail || res.statusText}`);
     }
@@ -255,7 +286,7 @@ function saveScore(entry) {
   }
   const scores = loadLocalScores();
   scores.push(normalized);
-  const topScores = sortScores(scores);
+  const topScores = dedupeScoresByName(scores);
   localStorage.setItem(SCORES_STORAGE_KEY, JSON.stringify(topScores));
   return normalized;
 }

@@ -28,9 +28,13 @@ That SQL:
 - creates `public.scores` if it does not exist;
 - enables RLS;
 - allows public ranking reads;
-- allows valid score inserts;
-- does not delete scores;
+- allows valid score inserts and updates;
+- keeps one score row per player name;
+- removes duplicated player names, keeping the highest score;
 - does not insert data.
+
+Run this SQL again whenever the migration changes. It is written to be safe for
+an existing `public.scores` table.
 
 ## 2. Connect the game
 

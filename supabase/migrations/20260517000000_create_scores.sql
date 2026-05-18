@@ -16,6 +16,9 @@ create table if not exists public.scores (
 
 alter table public.scores enable row level security;
 
+alter table public.scores
+  add column if not exists name_key text generated always as (lower(name)) stored;
+
 do $$
 begin
   if not exists (
@@ -91,8 +94,20 @@ end $$;
 create index if not exists scores_score_created_at_idx
   on public.scores (score desc, created_at asc);
 
+delete from public.scores s
+using public.scores newer
+where s.name_key = newer.name_key
+  and (
+    newer.score > s.score
+    or (newer.score = s.score and newer.created_at > s.created_at)
+    or (newer.score = s.score and newer.created_at = s.created_at and newer.id > s.id)
+  );
+
+create unique index if not exists scores_name_key_unique_idx
+  on public.scores (name_key);
+
 grant usage on schema public to anon;
-grant select, insert on public.scores to anon;
+grant select, insert, update on public.scores to anon;
 grant usage, select on sequence public.scores_id_seq to anon;
 
 drop policy if exists "scores are publicly readable" on public.scores;
@@ -115,6 +130,26 @@ with check (
     'El Diávolo (fácil)',
     'Chorizo Mezcla (medio)',
     'Mansa Gorda (difícil)'
+  )
+  and char_length(country) <= 40
+  and char_length(city) <= 60
+  and device in ('', 'desktop', 'touch')
+);
+
+drop policy if exists "players can update their named score" on public.scores;
+create policy "players can update their named score"
+on public.scores
+for update
+to anon
+using (true)
+with check (
+  char_length(name) between 1 and 16
+  and score between 0 and 999999999
+  and level between 1 and 6
+  and diff in (
+    'El DiÃ¡volo (fÃ¡cil)',
+    'Chorizo Mezcla (medio)',
+    'Mansa Gorda (difÃ­cil)'
   )
   and char_length(country) <= 40
   and char_length(city) <= 60
