@@ -11,12 +11,12 @@ let cachedScores = null;
 let scoresLastFetch = 0;
 let scoresFetchPromise = null;
 let scoresFetchFailed = false;
+let lastLeaderboardError = '';
+let lastScoreSubmitStatus = 'idle';
 let playerLocationPromise = null;
 const SCORES_REFRESH_MS = 60000;
 const SCORES_RETRY_MS = 10000;
-const SCORE_SUBMIT_COOLDOWN_MS = 30000;
 const SCORES_STORAGE_KEY = 'tetrispibal_scores';
-const SCORE_SUBMIT_STORAGE_KEY = 'tetrispibal_last_remote_score_submit';
 
 function getDeviceType() {
   return matchMedia('(pointer: coarse)').matches ? 'touch' : 'desktop';
@@ -85,17 +85,13 @@ function sortScores(scores) {
     .slice(0, 10);
 }
 
-function canSubmitRemoteScore() {
-  const last = Number(localStorage.getItem(SCORE_SUBMIT_STORAGE_KEY) || 0);
-  return !last || Date.now() - last >= SCORE_SUBMIT_COOLDOWN_MS;
-}
-
-function markRemoteScoreSubmit() {
-  localStorage.setItem(SCORE_SUBMIT_STORAGE_KEY, String(Date.now()));
-}
-
 function isSupabaseLeaderboardEnabled() {
   return SUPA_ENABLED;
+}
+
+function rememberLeaderboardError(message) {
+  lastLeaderboardError = sanitizeText(message, 240);
+  if (lastLeaderboardError) console.warn(`[ranking] ${lastLeaderboardError}`);
 }
 
 async function fetchPlayerLocationByIp() {
@@ -120,6 +116,13 @@ function getPlayerLocationInfo() {
   if (playerLocationPromise) return playerLocationPromise;
   playerLocationPromise = fetchPlayerLocationByIp();
   return playerLocationPromise;
+}
+
+function getPlayerLocationInfoQuickly() {
+  return Promise.race([
+    getPlayerLocationInfo(),
+    new Promise(resolve => setTimeout(() => resolve({ country: '', city: '' }), 700))
+  ]);
 }
 
 async function fetchScoresFromSupabase() {
@@ -152,6 +155,7 @@ async function fetchScoresFromSupabase() {
     .catch(() => {
       scoresFetchFailed = true;
       scoresLastFetch = Date.now();
+      rememberLeaderboardError('No se pudo cargar el ranking desde Supabase.');
       return null;
     })
     .finally(() => { scoresFetchPromise = null; });
@@ -186,11 +190,26 @@ function getLeaderboardStatus() {
   return 'loading';
 }
 
+function getLeaderboardDebugInfo() {
+  return {
+    supabaseEnabled: SUPA_ENABLED,
+    supabaseUrl: SUPA_BASE_URL,
+    hasAnonKey: !!SUPA_KEY,
+    status: getLeaderboardStatus(),
+    lastSubmitStatus: lastScoreSubmitStatus,
+    lastError: lastLeaderboardError,
+    cachedScores: cachedScores ? cachedScores.length : 0
+  };
+}
+
 async function saveScoreToSupabase(entry) {
-  if (!SUPA_ENABLED) return false;
-  if (!canSubmitRemoteScore()) return false;
+  if (!SUPA_ENABLED) {
+    lastScoreSubmitStatus = 'disabled';
+    return false;
+  }
+  lastScoreSubmitStatus = 'saving';
   try {
-    const location = await getPlayerLocationInfo();
+    const location = await getPlayerLocationInfoQuickly();
     const res = await fetch(`${SUPA_URL}/scores`, {
       method: 'POST',
       headers: {
@@ -207,16 +226,22 @@ async function saveScoreToSupabase(entry) {
         device: getDeviceType()
       })
     });
-    if (!res.ok) throw new Error('insert failed');
-    markRemoteScoreSubmit();
+    if (!res.ok) {
+      const detail = await res.text().catch(() => '');
+      throw new Error(`Supabase rechazo el puntaje (${res.status}): ${detail || res.statusText}`);
+    }
     cachedScores = null;
     scoresLastFetch = 0;
     scoresFetchFailed = false;
+    lastScoreSubmitStatus = 'saved';
+    lastLeaderboardError = '';
     refreshScoresFromSupabase();
     return true;
-  } catch {
+  } catch (error) {
     scoresFetchFailed = true;
     scoresLastFetch = Date.now();
+    lastScoreSubmitStatus = 'error';
+    rememberLeaderboardError(error && error.message ? error.message : 'No se pudo guardar el puntaje en Supabase.');
     return false;
   }
 }
@@ -234,3 +259,5 @@ function saveScore(entry) {
   localStorage.setItem(SCORES_STORAGE_KEY, JSON.stringify(topScores));
   return normalized;
 }
+
+window.tetrisPibalLeaderboardDebug = getLeaderboardDebugInfo;
