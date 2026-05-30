@@ -332,12 +332,14 @@ function loop(now) {
   if (inCountdown)   { drawCountdown(now);   requestAnimationFrame(loop); return; }
 
   if (state.won) {
-    stopMusic();
     onGameEnd(state.score, true);
-    startWinAnim(state.score,
-      ()=>{ goToMenu(); requestAnimationFrame(loop); },
-      ()=>{ goToMenu(); requestAnimationFrame(loop); }
-    );
+    const finalScore = state.score;
+    startWinTransition(finalScore, () => {
+      startWinAnim(finalScore,
+        ()=>{ goToMenu(); requestAnimationFrame(loop); },
+        ()=>{ goToMenu(); requestAnimationFrame(loop); }
+      );
+    });
     return;
   }
   if (state.over) {

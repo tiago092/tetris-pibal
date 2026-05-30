@@ -16,6 +16,7 @@ const MENU_CONFIG = {
 const WIN_CONFIG = {
   video: 'assets/video/ganaste.mp4',
   music: 'assets/sound/ganaste.mp3',
+  transitionMs: 2200,
 };
 
 // ---- Sonidos de juego ----
