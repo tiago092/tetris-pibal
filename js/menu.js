@@ -169,13 +169,75 @@ function drawGlowText(text, x, y, font, color, glowColor, glowBlur=18) {
   ctx.restore();
 }
 
-function drawHint(text, y, alpha=0.8) {
+function drawHint(text, y, alpha=0.8, color=null) {
   ctx.save();
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillStyle = `rgba(180,190,255,${alpha})`;
+  ctx.fillStyle = color || `rgba(180,190,255,${alpha})`;
   ctx.font = '20px monospace';
   ctx.shadowColor = `rgba(100,120,255,${alpha * 0.6})`; ctx.shadowBlur = 8;
   ctx.fillText(text, W/2, y);
+  ctx.restore();
+}
+
+function drawMainMenuContrast() {
+  const x = MENU_CONFIG.optionsX - 46;
+  const y = H * MENU_CONFIG.optionsStartY - 68;
+  const w = 245;
+  const h = MENU_CONFIG.optionsGap * (MENU_OPTIONS.length - 1) + 128;
+
+  ctx.save();
+  const menuShade = ctx.createRadialGradient(
+    x + w * 0.46, y + h * 0.5, 8,
+    x + w * 0.46, y + h * 0.5, w * 0.72
+  );
+  menuShade.addColorStop(0.00, 'rgba(0,0,0,0.46)');
+  menuShade.addColorStop(0.48, 'rgba(0,0,0,0.30)');
+  menuShade.addColorStop(1.00, 'rgba(0,0,0,0.00)');
+  ctx.fillStyle = menuShade;
+  ctx.fillRect(x, y, w, h);
+  ctx.restore();
+}
+
+function drawPixelMenuText(text, x, y, selected) {
+  ctx.save();
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = selected ? MENU_CONFIG.optionFontSelected : MENU_CONFIG.optionFont;
+  ctx.lineJoin = 'miter';
+  ctx.miterLimit = 1;
+
+  const shadow = MENU_CONFIG.optionShadowColor;
+  const offsets = [
+    [-3, 0], [3, 0], [0, -3], [0, 3],
+    [-2, -2], [2, -2], [-2, 2], [2, 2],
+  ];
+  ctx.fillStyle = shadow;
+  offsets.forEach(([ox, oy]) => ctx.fillText(text, x + ox, y + oy));
+
+  if (selected) {
+    ctx.shadowColor = MENU_CONFIG.optionSelectedGlow;
+    ctx.shadowBlur = 12;
+    ctx.fillStyle = MENU_CONFIG.optionSelectedColor;
+  } else {
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = MENU_CONFIG.optionColor;
+  }
+  ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+function drawPixelMenuSelector(x, y, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.font = MENU_CONFIG.optionFontSelected;
+  ctx.fillStyle = MENU_CONFIG.optionShadowColor;
+  ctx.fillText('▶', x + 2, y + 2);
+  ctx.shadowColor = MENU_CONFIG.optionSelectedGlow;
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = MENU_CONFIG.optionSelectedColor;
+  ctx.fillText('▶', x, y);
   ctx.restore();
 }
 
@@ -360,48 +422,37 @@ function drawMenu(now) {
 
   drawRankingTitle('TETRIS PIBAL', W/2, titleY, 44);
 
-  // opciones sin caja: solo texto con glow
+  drawMainMenuContrast();
+
+  // opciones arcade alineadas a la izquierda del bloque libre del fondo
   menuPulse += 0.04;
   MENU_OPTIONS.forEach((opt, i) => {
     const cyBase = H * MENU_CONFIG.optionsStartY + i * MENU_CONFIG.optionsGap;
     const btnDelay = 200 + i * 120;
     const btnT = Math.min(1, Math.max(0, (age - btnDelay) / 500));
     const slideEase = 1 - Math.pow(1 - btnT, 3);
-    const cy = cyBase + (1 - slideEase) * 70;
+    const cy = cyBase + (1 - slideEase) * 44;
     const sel = i === menuOption;
+    const tx = MENU_CONFIG.optionsX;
 
     ctx.save();
     ctx.globalAlpha = slideEase;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
 
     if (sel) {
-      const sc = 1 + 0.04 * Math.sin(menuPulse * 2);
-      ctx.translate(W/2, cy); ctx.scale(sc, sc); ctx.translate(-W/2, -cy);
-      // sombra negra gruesa de fondo
-      ctx.shadowColor = 'rgba(0,0,0,1)'; ctx.shadowBlur = 22; ctx.shadowOffsetX = 3; ctx.shadowOffsetY = 5;
-      ctx.font = 'bold 27px monospace'; ctx.fillStyle = '#ffe600';
-      ctx.fillText(opt, W/2, cy);
-      // glow dorado
-      ctx.shadowColor = 'rgba(255,180,0,0.95)'; ctx.shadowBlur = 36; ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0;
-      ctx.fillText(opt, W/2, cy);
-      ctx.shadowBlur = 14;
-      ctx.fillText(opt, W/2, cy);
-      ctx.shadowBlur = 0;
-      // flechas
-      ctx.fillStyle = 'rgba(255,220,0,0.85)'; ctx.font = 'bold 18px monospace';
-      ctx.fillText('▶', W/2 - 130, cy);
-      ctx.fillText('◀', W/2 + 130, cy);
+      const pulse = 1 + 0.018 * Math.sin(menuPulse * 2);
+      const arrowAlpha = 0.88 + 0.12 * Math.sin(menuPulse * 2);
+      ctx.translate(tx, cy);
+      ctx.scale(pulse, pulse);
+      ctx.translate(-tx, -cy);
+      drawPixelMenuSelector(tx - MENU_CONFIG.selectorGap, cy, arrowAlpha);
+      drawPixelMenuText(opt, tx, cy, true);
     } else {
-      // sombra negra fuerte
-      ctx.shadowColor = 'rgba(0,0,0,1)'; ctx.shadowBlur = 18; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 4;
-      ctx.font = 'bold 22px monospace'; ctx.fillStyle = '#dde0ff';
-      ctx.fillText(opt, W/2, cy);
-      ctx.shadowOffsetX = 0; ctx.shadowOffsetY = 0; ctx.shadowBlur = 0;
+      drawPixelMenuText(opt, tx, cy, false);
     }
     ctx.restore();
   });
 
-  drawHint('↑ ↓ navegar   ENTER confirmar', H - 30, 1.0);
+  drawHint('↑↓ mover    ENTER seleccionar', H - 28, 0.58, MENU_CONFIG.footerColor);
   drawMuteIndicator();
 }
 

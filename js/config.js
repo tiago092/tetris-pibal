@@ -8,8 +8,17 @@
 const MENU_CONFIG = {
   bg:    'assets/img/achitiago-pixel.png',
   music: 'assets/sound/intro.mp3',
-  optionsStartY: 0.51,
-  optionsGap: 62,
+  optionsX: 92,
+  optionsStartY: 0.60,
+  optionsGap: 56,
+  selectorGap: 22,
+  optionFont: '800 25px "Courier New", monospace',
+  optionFontSelected: '900 27px "Courier New", monospace',
+  optionColor: '#f1f3ff',
+  optionShadowColor: 'rgba(0,0,0,0.96)',
+  optionSelectedColor: '#ffe600',
+  optionSelectedGlow: 'rgba(255,205,0,0.42)',
+  footerColor: 'rgba(210,218,255,0.58)',
 };
 
 // ---- Pantalla de victoria ----
