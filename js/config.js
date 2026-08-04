@@ -61,7 +61,7 @@ const LEVELS = [
     blockStyle: 'fire',
     opacity: 0.45,
     tint:    'rgba(20,10,0,0.15)',
-    music:   'assets/sound/castro.mp3',
+    music:   'assets/sound/enlabirrafest.mp3',
     border:  ['#5a3a10', '#a07828'],
     grid:    'rgba(255,200,100,0.07)',
     hud:     { label:'#c8a050', value:'#ffe88c', panel:'rgba(60,35,5,0.5)', border:'#7a5520', title:'#ffcc44' },
