@@ -16,6 +16,7 @@ let playerName   = '';
 let currentDiff  = DIFFICULTIES[1];
 let menuEnterTime = 0;
 let leaderboardRefreshing = false;
+const DEBUG_MODE = new URLSearchParams(window.location.search).get('debug') === '1';
 
 // ---- Shake ----
 let shake = { intensity: 0, duration: 0, elapsed: 0 };
@@ -41,6 +42,7 @@ function getShakeOffset(dt) {
 // ---- Canvas setup ----
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
+const debugLevelButton = document.getElementById('debugLevelButton');
 canvas.width = W; canvas.height = H;
 
 // ---- Input HTML para nombre ----
@@ -269,6 +271,10 @@ function handleGameAction(action) {
   }
 
   if (!musicUnlocked) { unlockGameAudio(); checkMusic(state.level); }
+  if (type === 'debugLevelUp') {
+    if (DEBUG_MODE) debugAdvanceLevel(state);
+    return;
+  }
   if (type === 'pause') { pauseGame(); return; }
   if (type === 'restart') {
     if (state && state.over && window.restartFromGameOver) window.restartFromGameOver();
@@ -294,8 +300,18 @@ window.getGameUiState = function getGameUiState() {
     paused: !!(state && state.paused),
     over: !!(state && state.over),
     won: !!(state && state.won),
+    debugMode: DEBUG_MODE,
+    debugUsed: !!(state && state.debugUsed),
   };
 };
+
+if (debugLevelButton) {
+  debugLevelButton.addEventListener('click', e => {
+    e.preventDefault();
+    e.stopPropagation();
+    handleGameAction('debugLevelUp');
+  });
+}
 
 // ---- Input: nombre ----
 nameInput.addEventListener('keydown', e => {
@@ -325,6 +341,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'z' || e.key === 'Z') { if (!e.repeat) handleGameAction('rotateCCW'); return; }
   if (e.key === 'c' || e.key === 'C' || e.key === 'Shift') { if (!e.repeat) handleGameAction('hold'); return; }
   if (e.key === 'r' || e.key === 'R') { if (!e.repeat) handleGameAction('restart'); return; }
+  if ((e.key === 'n' || e.key === 'N') && DEBUG_MODE) { if (!e.repeat) handleGameAction('debugLevelUp'); return; }
   if (e.key === ' ') {
     e.preventDefault();
     handleGameAction('hardDrop');
@@ -359,6 +376,11 @@ let lastTime = performance.now();
 let lastMediaEnsure = 0;
 function loop(now) {
   const dt=now-lastTime; lastTime=now;
+
+  if (debugLevelButton) {
+    debugLevelButton.hidden = !DEBUG_MODE || inMenu || inNameEntry || inDifficulty ||
+      inLeaderboard || inCredits || inCountdown || !state || state.paused || state.over || state.won;
+  }
 
   if (inMenu)        { drawMenu(now);        requestAnimationFrame(loop); return; }
   if (inNameEntry)   { drawNameEntry();      requestAnimationFrame(loop); return; }

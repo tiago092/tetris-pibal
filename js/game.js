@@ -220,6 +220,7 @@ function createState() {
     specialBanner: null,
     groundedAt:null,
     lockResets:0,
+    debugUsed:false,
   };
   gameState.piece = createPiece(takeNextShape(gameState));
   fillNextQueue(gameState);
@@ -227,6 +228,7 @@ function createState() {
 }
 
 function onGameEnd(score, won) {
+  if (state && state.debugUsed) return null;
   const finalLevel = Math.max(1, Math.min(state.level + 1, LEVELS.length));
   const entry = { name: playerName, score, diff: currentDiff.name,
                   level: finalLevel, won, date: new Date().toLocaleDateString(), _new: true };
@@ -242,6 +244,37 @@ function onGameEnd(score, won) {
 }
 
 let state; // inicializado en main.js después de que currentDiff esté disponible
+
+function advanceLevelIfNeeded(gameState) {
+  const newLevel = Math.floor(gameState.lines/15);
+  if (newLevel <= gameState.level) return false;
+
+  gameState.level = newLevel;
+  if (gameState.level >= LEVELS.length) {
+    gameState.won = true;
+    return true;
+  }
+
+  gameState.fallDelay = Math.max(currentDiff.minDelay, currentDiff.fallDelay - gameState.level * currentDiff.speedStep);
+  applyLevelBg(gameState.level);
+  playSound(levelupSound); playSound(levelupSound2);
+  if (musicUnlocked) checkMusic(gameState.level);
+  triggerShake(12, 700);
+  triggerLevelUpExplosion(gameState.level);
+  gameState.levelBanner = { name: getTheme(gameState.level).name, startTime: performance.now() };
+  return true;
+}
+
+function debugAdvanceLevel(gameState=state) {
+  if (!gameState || gameState.paused || gameState.over || gameState.won || gameState.clearingRows) return false;
+  gameState.debugUsed = true;
+  gameState.lines = Math.max(gameState.lines, (gameState.level+1)*15);
+  const advanced = advanceLevelIfNeeded(gameState);
+  const now = performance.now();
+  gameState.lastFall = now;
+  if (gameState.groundedAt !== null) gameState.groundedAt = now;
+  return advanced;
+}
 
 function finishLineClear() {
   const { rows, special } = state.clearingRows;
@@ -263,18 +296,8 @@ function finishLineClear() {
 
   state.lines += rows.length;
   state.score += (LINE_SCORES[rows.length]||0) * (state.level+1);
-  const newLevel = Math.floor(state.lines/15);
-  if (newLevel > state.level) {
-    state.level = newLevel;
-    if (state.level >= LEVELS.length) { state.won=true; return; }
-    state.fallDelay = Math.max(currentDiff.minDelay, currentDiff.fallDelay - state.level * currentDiff.speedStep);
-    applyLevelBg(state.level);
-    playSound(levelupSound); playSound(levelupSound2);
-    if (musicUnlocked) checkMusic(state.level);
-    triggerShake(12, 700);
-    triggerLevelUpExplosion(state.level);
-    state.levelBanner = { name: getTheme(state.level).name, startTime: performance.now() };
-  }
+  advanceLevelIfNeeded(state);
+  if (state.won) return;
 
   activateNextPiece(state);
 }
@@ -302,18 +325,8 @@ function doLock() {
     state.clearingRows = { rows: full, startTime: performance.now(), special };
   } else {
     state.combo = 0;
-    const newLevel = Math.floor(state.lines/15);
-    if (newLevel > state.level) {
-      state.level = newLevel;
-      if (state.level >= LEVELS.length) { state.won=true; return; }
-      state.fallDelay = Math.max(currentDiff.minDelay, currentDiff.fallDelay - state.level * currentDiff.speedStep);
-      applyLevelBg(state.level);
-      playSound(levelupSound); playSound(levelupSound2);
-      if (musicUnlocked) checkMusic(state.level);
-      triggerShake(12, 700);
-      triggerLevelUpExplosion(state.level);
-      state.levelBanner = { name: getTheme(state.level).name, startTime: performance.now() };
-    }
+    advanceLevelIfNeeded(state);
+    if (state.won) return;
     activateNextPiece(state);
   }
 }

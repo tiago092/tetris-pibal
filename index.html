@@ -40,6 +40,23 @@
       touch-action: none;
     }
     #gameOverVideo { display: none; }
+    #debugLevelButton {
+      position: fixed;
+      top: max(68px, calc(env(safe-area-inset-top) + 68px));
+      right: max(12px, env(safe-area-inset-right));
+      z-index: 30;
+      border: 1px solid rgba(255,230,0,0.72);
+      border-radius: 8px;
+      background: linear-gradient(180deg, rgba(106,76,0,0.96), rgba(38,25,0,0.96));
+      color: #ffe600;
+      padding: 9px 12px;
+      font: bold 14px monospace;
+      box-shadow: 0 5px 16px rgba(0,0,0,0.45), 0 0 12px rgba(255,230,0,0.18);
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    #debugLevelButton:active { transform: translateY(1px); }
+    #debugLevelButton[hidden] { display: none; }
     #touchControls {
       display: none;
       pointer-events: none;
@@ -135,6 +152,7 @@
   </style>
 </head>
 <body>
+  <button id="debugLevelButton" type="button" title="Modo de prueba: avanzar un nivel (N)" hidden>NIVEL +</button>
   <canvas id="c"></canvas>
   <video id="gameOverVideo" src="assets/video/quepuedoeu.mp4" loop playsinline muted></video>
   <script src="js/config.js"></script>

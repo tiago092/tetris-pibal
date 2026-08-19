@@ -96,6 +96,20 @@ const tests = String.raw`
   perfectBoard[18][0]='x';
   assert.strictEqual(isPerfectClearAfterRows(perfectBoard,[19]),false);
 
+  // La herramienta de prueba alcanza la victoria real y marca la partida como no puntuable.
+  const debugWin={
+    level:LEVELS.length-1, lines:(LEVELS.length-1)*15,
+    paused:false, over:false, won:false, clearingRows:null,
+    groundedAt:10, lastFall:0, debugUsed:false,
+  };
+  assert.strictEqual(debugAdvanceLevel(debugWin),true);
+  assert.strictEqual(debugWin.level,LEVELS.length);
+  assert.strictEqual(debugWin.lines,LEVELS.length*15);
+  assert.strictEqual(debugWin.won,true);
+  assert.strictEqual(debugWin.debugUsed,true);
+  state=debugWin;
+  assert.strictEqual(onGameEnd(999999,true),null);
+
 })();
 `;
 
@@ -104,6 +118,7 @@ const context = vm.createContext({
   console,
   performance:{ now:()=>0 },
   navigator:{ vibrate:()=>{} },
+  LEVELS:Array.from({ length:6 },(_,index)=>({ name:`Nivel ${index+1}` })),
 });
 
 vm.runInContext(`${constants}\n${game}\n${tests}`, context, { filename:'game-logic.bundle.js' });

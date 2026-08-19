@@ -7,21 +7,21 @@ const path = require('path');
   const errors = [];
   const url = pathToFileURL(path.join(process.cwd(), 'index.html')).href;
 
-  async function preparePage(options) {
+  async function preparePage(options, debug=false, name='Smoke') {
     const context = await browser.newContext(options);
     const page = await context.newPage();
     page.on('pageerror', error => errors.push(`pageerror: ${error.message}`));
     page.on('console', message => {
       if (message.type() === 'error') errors.push(`console.error: ${message.text()}`);
     });
-    await page.goto(url, { waitUntil:'domcontentloaded' });
-    await page.evaluate(() => {
-      playerName='Smoke';
+    await page.goto(debug ? `${url}?debug=1` : url, { waitUntil:'domcontentloaded' });
+    await page.evaluate(player => {
+      playerName=player;
       currentDiff=DIFFICULTIES[1];
       inMenu=false; inNameEntry=false; inDifficulty=false;
       inLeaderboard=false; inCredits=false; inCountdown=false;
       state=createState();
-    });
+    }, name);
     return { context, page };
   }
 
@@ -56,6 +56,7 @@ const path = require('path');
   await desktop.page.keyboard.press('KeyN');
   const levelAfter=await desktop.page.evaluate(() => state.level);
   if (levelAfter !== levelBefore) errors.push('public N level skip is still active');
+  if (await desktop.page.locator('#debugLevelButton').isVisible()) errors.push('debug button is public without ?debug=1');
   await desktop.context.close();
 
   const mobile=await preparePage({ viewport:{ width:390,height:844 },hasTouch:true,isMobile:true });
@@ -77,13 +78,46 @@ const path = require('path');
   if (!mobileHeld) errors.push('mobile Hold action failed');
   await mobile.context.close();
 
+  const debug=await preparePage({ viewport:{ width:800,height:900 } },true,'DebugSmoke');
+  await debug.page.evaluate(() => {
+    window.__debugSaveCalls=0;
+    const originalSaveScore=saveScore;
+    saveScore=entry => {
+      window.__debugSaveCalls++;
+      return originalSaveScore(entry);
+    };
+  });
+  await debug.page.locator('#debugLevelButton').waitFor({ state:'visible' });
+  await debug.page.keyboard.press('KeyN');
+  for (let i=0;i<5;i++) await debug.page.locator('#debugLevelButton').click();
+  await debug.page.waitForTimeout(3000);
+  const debugWin=await debug.page.evaluate(() => ({
+    levelCount:LEVELS.length,
+    level:state.level,
+    lines:state.lines,
+    won:state.won,
+    debugUsed:state.debugUsed,
+    saveCalls:window.__debugSaveCalls,
+    savedScores:loadScores().filter(entry=>entry.name==='DebugSmoke').length,
+    levelMusicStopped:musicEl===null,
+    winVideoPlaying:!winVideo.paused,
+    buttonHidden:document.getElementById('debugLevelButton').hidden,
+  }));
+  if (debugWin.level !== debugWin.levelCount || debugWin.lines !== debugWin.levelCount*15 || !debugWin.won || !debugWin.debugUsed)
+    errors.push(`debug level progression failed: ${JSON.stringify(debugWin)}`);
+  if (debugWin.saveCalls || debugWin.savedScores)
+    errors.push(`debug victory contaminated ranking: ${JSON.stringify(debugWin)}`);
+  if (!debugWin.levelMusicStopped || !debugWin.winVideoPlaying || !debugWin.buttonHidden)
+    errors.push(`debug victory transition incomplete: ${JSON.stringify(debugWin)}`);
+  await debug.context.close();
+
   await browser.close();
 
   if (errors.length) {
     console.error(errors.join('\n'));
     process.exit(1);
   }
-  console.log('OK: desktop and mobile gameplay smoke tests');
+  console.log('OK: desktop, mobile and debug-victory gameplay smoke tests');
 })().catch(error => {
   console.error(error.stack || error);
   process.exit(1);
