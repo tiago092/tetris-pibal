@@ -5,8 +5,9 @@
   "description": "Tetris Pibal web app.",
   "scripts": {
     "check:syntax": "node scripts/check-syntax.js",
+    "test:logic": "node scripts/game-logic.test.js",
     "smoke": "node scripts/smoke.js",
-    "test": "npm run check:syntax && npm run smoke",
+    "test": "npm run check:syntax && npm run test:logic && npm run smoke",
     "build": "node scripts/prepare-static-deploy.js",
     "supabase:start": "supabase start",
     "supabase:stop": "supabase stop",

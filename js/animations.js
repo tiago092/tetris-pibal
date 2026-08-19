@@ -611,16 +611,20 @@ function startGameOverAnim(board, score, stats, onRestart, onQuit) {
   }
 
   function stopVideo() { gameOverVideo.pause(); gameOverVideo.currentTime=0; defeatSong.pause(); defeatSong.currentTime=0; }
-  function finishGameOver() {
+  function finishGameOver(restart=false) {
+    if (stopped) return;
     stopped = true;
     stopVideo();
     document.removeEventListener('keydown', onKey);
     document.removeEventListener('pointerdown', onPointer);
-    onQuit();
+    window.restartFromGameOver = null;
+    if (restart) onRestart();
+    else onQuit();
   }
 
   function onKey(e) {
-    if (e.key==='Enter'||e.key==='Escape') finishGameOver();
+    if (e.key==='r'||e.key==='R') finishGameOver(true);
+    else if (e.key==='Enter'||e.key==='Escape') finishGameOver();
   }
   function onPointer(e) {
     if (e.target.closest && e.target.closest('#touchControls')) return;
@@ -628,5 +632,6 @@ function startGameOverAnim(board, score, stats, onRestart, onQuit) {
   }
   document.addEventListener('keydown',onKey);
   document.addEventListener('pointerdown',onPointer);
+  window.restartFromGameOver = () => finishGameOver(true);
   requestAnimationFrame(frame);
 }

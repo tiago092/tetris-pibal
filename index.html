@@ -82,7 +82,7 @@
       grid-template-columns: repeat(2, 64px);
     }
     .touch-right-cluster {
-      grid-template-columns: repeat(3, 58px);
+      grid-template-columns: repeat(2, 58px);
     }
     .touch-btn {
       pointer-events: auto;
@@ -110,15 +110,24 @@
     .touch-hard {
       color: #ffe600;
     }
+    .touch-hold {
+      grid-column: 1 / -1;
+      width: 138px;
+      height: 46px;
+      font-size: 15px;
+      color: #88f7ff;
+    }
     .touch-back,
     .touch-confirm,
-    .touch-pause {
-      visibility: hidden;
+    .touch-pause,
+    .touch-restart {
+      display: none;
     }
     #touchControls.show-back .touch-back,
     #touchControls.show-confirm .touch-confirm,
-    #touchControls.show-pause .touch-pause {
-      visibility: visible;
+    #touchControls.show-pause .touch-pause,
+    #touchControls.show-restart .touch-restart {
+      display: block;
     }
     @media (pointer: fine) and (min-width: 901px) {
       #touchControls { display: none !important; }

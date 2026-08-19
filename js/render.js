@@ -404,59 +404,85 @@ function drawComboBadge(text, color, y, scale=1, alpha=1) {
   ctx.restore();
 }
 
-function drawHUD(score, level, lines, nextPiece, theme) {
+function drawMiniPiece(piece, centerX, centerY, cellSize, alpha=1) {
+  if (!piece) return;
+  const offsets=PIECES[piece.shape][0];
+  const minDx=Math.min(...offsets.map(([dx])=>dx)), minDy=Math.min(...offsets.map(([,dy])=>dy));
+  const maxDx=Math.max(...offsets.map(([dx])=>dx)), maxDy=Math.max(...offsets.map(([,dy])=>dy));
+  const width=(maxDx-minDx+1)*cellSize, height=(maxDy-minDy+1)*cellSize;
+  const ox=centerX-width/2-minDx*cellSize, oy=centerY-height/2-minDy*cellSize;
+  ctx.save();
+  ctx.globalAlpha=alpha;
+  for (const [dx,dy] of offsets)
+    drawBlock3D(ctx,COLORS[piece.shape],ox+dx*cellSize,oy+dy*cellSize,cellSize,Math.max(1,BV-3));
+  ctx.restore();
+}
+
+function drawHUD(state, theme) {
+  const { score, level, lines, nextQueue, heldPiece, canHold } = state;
   const hx=BX+BW+16, hw=W-hx-8;
   const h = theme.hud;
   const pr = 7;
 
-  function roundPanel(py, ph) {
+  function roundPanel(py, ph, fill=h.panel, border=h.border) {
     ctx.save();
     ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=8;
     ctx.beginPath(); ctx.roundRect(hx, py, hw, ph, pr);
-    ctx.fillStyle=h.panel; ctx.fill();
+    ctx.fillStyle=fill; ctx.fill();
     ctx.restore();
     ctx.beginPath(); ctx.roundRect(hx, py, hw, ph, pr);
-    ctx.strokeStyle=h.border; ctx.lineWidth=1.5; ctx.stroke();
+    ctx.strokeStyle=border; ctx.lineWidth=1.5; ctx.stroke();
   }
 
   function panel(label, value, py) {
-    roundPanel(py, 52);
+    roundPanel(py, 48);
     ctx.fillStyle=h.label; ctx.font='bold 11px monospace'; ctx.textBaseline='top';
     ctx.textAlign='left'; ctx.fillText(label, hx+8, py+7);
-    ctx.fillStyle=h.value; ctx.font='bold 22px monospace';
-    ctx.fillText(String(value), hx+8, py+22);
+    ctx.fillStyle=h.value; ctx.font='bold 20px monospace';
+    ctx.fillText(String(value), hx+8, py+21);
   }
   panel('SCORE', score, 28);
-  panel('LEVEL', level+1, 90);
-  panel('LINES', lines, 152);
+  panel('LEVEL', level+1, 84);
+  panel('LINES', lines, 140);
 
-  // etiqueta NEXT con fondo propio
-  roundPanel(214, 22);
+  roundPanel(196, 20);
   ctx.fillStyle=h.value; ctx.font='bold 12px monospace'; ctx.textBaseline='middle';
-  ctx.textAlign='center'; ctx.fillText('NEXT', hx+hw/2, 225);
+  ctx.textAlign='center'; ctx.fillText('PRÓXIMA', hx+hw/2, 206);
 
-  roundPanel(238, 96);
-  const offsets=PIECES[nextPiece.shape][0];
-  const minDx=Math.min(...offsets.map(([dx])=>dx)), minDy=Math.min(...offsets.map(([,dy])=>dy));
-  const maxDx=Math.max(...offsets.map(([dx])=>dx)), maxDy=Math.max(...offsets.map(([,dy])=>dy));
-  const nc=CS-4;
-  const ox=hx+(hw-(maxDx-minDx+1)*nc)/2-minDx*nc;
-  const oy=244+(90-(maxDy-minDy+1)*nc)/2-minDy*nc;
-  for (const [dx,dy] of offsets)
-    drawBlock3D(ctx, COLORS[nextPiece.shape], ox+dx*nc, oy+dy*nc, nc, Math.max(2,BV-2));
+  roundPanel(220, 88);
+  drawMiniPiece(nextQueue[0],hx+hw/2,264,23,1);
 
-  roundPanel(344, 132);
+  const holdBorder=canHold ? '#55e7ff' : 'rgba(85,231,255,0.42)';
+  const holdFill=canHold ? 'rgba(0,38,52,0.82)' : 'rgba(0,25,36,0.68)';
+  roundPanel(324, 100, holdFill, holdBorder);
+  ctx.fillStyle=canHold ? '#8ff3ff' : 'rgba(143,243,255,0.58)';
+  ctx.font='bold 11px monospace'; ctx.textBaseline='middle';
+  ctx.textAlign='center'; ctx.fillText('HOLD · RESERVA  [C]', hx+hw/2, 336);
+  ctx.strokeStyle='rgba(85,231,255,0.22)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(hx+10,348); ctx.lineTo(hx+hw-10,348); ctx.stroke();
+
+  if (heldPiece) drawMiniPiece(heldPiece,hx+hw/2,386,23,1);
+  else {
+    ctx.fillStyle='rgba(255,255,255,0.24)'; ctx.font='bold 18px monospace';
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('—',hx+hw/2,386);
+  }
+  if (heldPiece && !canHold) {
+    ctx.fillStyle='rgba(143,243,255,0.62)'; ctx.font='bold 8px monospace';
+    ctx.textAlign='right'; ctx.textBaseline='bottom'; ctx.fillText('USADO',hx+hw-7,420);
+  }
+
+  roundPanel(440, 164);
   ctx.fillStyle=h.label; ctx.font='bold 11px monospace'; ctx.textBaseline='top'; ctx.textAlign='left';
-  ctx.fillText('CONTROLES', hx+8, 352);
-  const ctrl=[['←→','mover'],['↑','rotar'],['↓','bajar'],['SPC','caída'],['P','pausa'],['N','nivel+']];
+  ctx.fillText('CONTROLES', hx+8, 448);
+  const ctrl=[['←→','mover'],['Z/X','girar'],['C','hold'],['↓','bajar'],['SPC','caída'],['P','pausa'],['R','reiniciar']];
   for (let i=0;i<ctrl.length;i++) {
-    ctx.fillStyle=h.value; ctx.font='bold 11px monospace'; ctx.fillText(ctrl[i][0], hx+8,  368+i*18);
-    ctx.fillStyle=h.label; ctx.font='11px monospace';      ctx.fillText(ctrl[i][1], hx+40, 368+i*18);
+    ctx.fillStyle=h.value; ctx.font='bold 10px monospace'; ctx.fillText(ctrl[i][0], hx+8,  466+i*18);
+    ctx.fillStyle=h.label; ctx.font='10px monospace';      ctx.fillText(ctrl[i][1], hx+42, 466+i*18);
   }
 
   // nombre del tema
   ctx.fillStyle=h.title; ctx.font='italic 10px monospace'; ctx.textBaseline='top'; ctx.textAlign='left';
-  ctx.fillText(theme.name, hx+8, 484);
+  ctx.fillText(theme.name, hx+8, 616);
 
   // título TETRIS arriba del tablero
   ctx.save();
@@ -476,7 +502,7 @@ function drawHUD(score, level, lines, nextPiece, theme) {
 }
 
 function drawGame(state) {
-  const { board, piece, nextPiece, score, level, lines,
+  const { board, piece, level,
           flashAlpha, particles, comboTexts } = state;
   const theme = getTheme(level);
 
@@ -563,6 +589,29 @@ function drawGame(state) {
 
   for (const ct of comboTexts) ct.draw(ctx);
 
+  if (state.specialBanner) {
+    const age=performance.now()-state.specialBanner.startTime;
+    const dur=1800;
+    if (age<dur) {
+      const t=age/dur;
+      const alpha=t<0.12 ? t/0.12 : t>0.72 ? 1-(t-0.72)/0.28 : 1;
+      const perfect=state.specialBanner.text==='PERFECT CLEAR';
+      const color=perfect ? '#ffe600' : '#40e8ff';
+      const scale=1+(1-Math.min(1,t/0.18))*0.28;
+      ctx.save();
+      ctx.translate(BX+BW/2,BY+BH*0.42);
+      ctx.scale(scale,scale);
+      ctx.globalAlpha=Math.max(0,alpha);
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.font=perfect ? '900 30px Arial Black, Impact, sans-serif' : '900 42px Arial Black, Impact, sans-serif';
+      ctx.lineJoin='round'; ctx.strokeStyle='rgba(0,0,0,0.9)'; ctx.lineWidth=8;
+      ctx.strokeText(state.specialBanner.text,0,0);
+      ctx.shadowColor=color; ctx.shadowBlur=24; ctx.fillStyle=color;
+      ctx.fillText(state.specialBanner.text,0,0);
+      ctx.restore();
+    } else state.specialBanner=null;
+  }
+
   // bordes del panel (sin relleno, encima de todo)
   { const px=BX-10, py=BY-10, pw=BW+20, ph=BH+20, pr=10;
     ctx.beginPath(); ctx.roundRect(px, py, pw, ph, pr);
@@ -601,5 +650,5 @@ function drawGame(state) {
     }
   }
 
-  drawHUD(score, level, lines, nextPiece, theme);
+  drawHUD(state, theme);
 }

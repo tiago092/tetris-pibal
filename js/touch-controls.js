@@ -12,14 +12,17 @@ function installTouchControls({ canvas, dispatch }) {
       <button class="touch-btn touch-confirm" data-action="confirm" aria-label="Confirmar">OK</button>
       <button class="touch-btn touch-mute" data-action="mute" aria-label="Sonido">M</button>
       <button class="touch-btn touch-pause" data-action="pause" aria-label="Pausa">P</button>
+      <button class="touch-btn touch-restart" data-action="restart" aria-label="Reiniciar">R</button>
     </div>
     <div class="touch-pad">
       <div class="touch-cluster touch-left-cluster">
         <button class="touch-btn touch-action" data-action="left" data-repeat="true" aria-label="Izquierda">&#9664;</button>
         <button class="touch-btn touch-action" data-action="right" data-repeat="true" aria-label="Derecha">&#9654;</button>
+        <button class="touch-btn touch-action touch-hold" data-action="hold" aria-label="Guardar pieza">HOLD</button>
       </div>
       <div class="touch-cluster touch-right-cluster">
-        <button class="touch-btn touch-action" data-action="rotate" aria-label="Rotar">&#8635;</button>
+        <button class="touch-btn touch-action" data-action="rotateCCW" aria-label="Girar a la izquierda">&#8634;</button>
+        <button class="touch-btn touch-action" data-action="rotateCW" aria-label="Girar a la derecha">&#8635;</button>
         <button class="touch-btn touch-action" data-action="softDrop" data-repeat="true" aria-label="Bajar">&#9660;</button>
         <button class="touch-btn touch-action touch-hard" data-action="hardDrop" aria-label="Caida rapida">&#10515;</button>
       </div>
@@ -107,7 +110,7 @@ function installTouchControls({ canvas, dispatch }) {
     if (!ui.inGame || ui.inCountdown || ui.over || ui.won) {
       dispatch({ type: 'tap', x: gesture.x, y: gesture.y });
     } else if (adx < 12 && ady < 12) {
-      dispatch('rotate');
+      dispatch('rotateCW');
     } else if (ady > adx && dy > 34) {
       dispatch(dy > 90 ? 'hardDrop' : 'softDrop');
     } else if (adx > 28) {
@@ -128,6 +131,7 @@ function installTouchControls({ canvas, dispatch }) {
     root.classList.toggle('show-confirm', show && (ui.inMenu || ui.inNameEntry || ui.inDifficulty || ui.inLeaderboard || ui.inCredits));
     root.classList.toggle('show-back', show && (ui.inNameEntry || ui.inDifficulty || ui.inLeaderboard || ui.inCredits));
     root.classList.toggle('show-pause', inGameControls);
+    root.classList.toggle('show-restart', show && (inGameControls || ui.over));
     document.body.classList.toggle('touch-game-active', inGameControls);
     if (lastGameControls !== inGameControls && window.resizeGameCanvas) {
       lastGameControls = inGameControls;

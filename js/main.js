@@ -133,29 +133,42 @@ function pauseGame() {
   if (!state || state.over || state.won) return;
   state.paused = !state.paused;
   if (state.paused) musicEl && musicEl.pause();
-  else musicEl && musicEl.play().catch(() => {});
+  else {
+    const now = performance.now();
+    state.lastFall = now;
+    if (state.groundedAt !== null) state.groundedAt = now;
+    musicEl && musicEl.play().catch(() => {});
+  }
 }
 
 function movePiece(dx) {
-  if (!state || state.paused || state.over || state.won) return;
+  if (!state || state.paused || state.over || state.won || state.clearingRows) return;
   const t = { ...state.piece, x: state.piece.x + dx };
-  if (valid(state.board, t)) state.piece = t;
+  if (valid(state.board, t)) applySuccessfulManipulation(state,t,performance.now());
 }
 
-function rotatePiece() {
-  if (!state || state.paused || state.over || state.won) return;
-  const t = { ...state.piece, rot: state.piece.rot + 1 };
-  if (valid(state.board, t)) { state.piece = t; playRotateSound(); }
+function rotatePiece(direction=1) {
+  if (!state || state.paused || state.over || state.won || state.clearingRows) return;
+  const t = tryRotate(state.board,state.piece,direction);
+  if (t) {
+    applySuccessfulManipulation(state,t,performance.now());
+    playRotateSound();
+  }
 }
 
 function softDropPiece() {
-  if (!state || state.paused || state.over || state.won) return;
+  if (!state || state.paused || state.over || state.won || state.clearingRows) return;
   const t = { ...state.piece, y: state.piece.y + 1 };
-  if (valid(state.board, t)) { state.piece = t; state.lastFall = performance.now(); }
+  if (valid(state.board, t)) {
+    const now = performance.now();
+    state.piece = t;
+    state.lastFall = now;
+    state.groundedAt = isGrounded(state.board,t) ? now : null;
+  }
 }
 
 function hardDropPiece() {
-  if (!state || state.paused || state.over || state.won) return;
+  if (!state || state.paused || state.over || state.won || state.clearingRows) return;
   while (true) {
     const t = { ...state.piece, y: state.piece.y + 1 };
     if (valid(state.board, t)) state.piece = t;
@@ -163,6 +176,20 @@ function hardDropPiece() {
   }
   playHardDropSound();
   doLock();
+}
+
+function holdPiece() {
+  if (!state || state.paused || state.over || state.won || state.clearingRows) return;
+  if (holdCurrentPiece(state,performance.now())) playRotateSound();
+}
+
+function restartCurrentGame() {
+  if (!state || inMenu || inNameEntry || inDifficulty || inLeaderboard || inCredits || inCountdown) return;
+  state = createState();
+  explosionParticles = [];
+  shake = { intensity:0, duration:0, elapsed:0 };
+  lastMediaEnsure = 0;
+  if (musicUnlocked) checkMusic(state.level);
 }
 
 function handleGameTap(x, y) {
@@ -191,7 +218,7 @@ function handleGameTap(x, y) {
     return;
   }
   if (inLeaderboard || inCredits) { goBack(); return; }
-  if (!inCountdown) rotatePiece();
+  if (!inCountdown) rotatePiece(1);
 }
 
 function handleGameAction(action) {
@@ -243,11 +270,17 @@ function handleGameAction(action) {
 
   if (!musicUnlocked) { unlockGameAudio(); checkMusic(state.level); }
   if (type === 'pause') { pauseGame(); return; }
-  if (type === 'levelSkip') { state.lines = ((state.level + 1) * 15); doLock(); return; }
+  if (type === 'restart') {
+    if (state && state.over && window.restartFromGameOver) window.restartFromGameOver();
+    else if (state && !state.over && !state.won) restartCurrentGame();
+    return;
+  }
   if (state.paused || state.over || state.won) return;
   if (type === 'left') movePiece(-1);
   else if (type === 'right') movePiece(1);
-  else if (type === 'rotate' || type === 'up') rotatePiece();
+  else if (type === 'rotate' || type === 'rotateCW' || type === 'up') rotatePiece(1);
+  else if (type === 'rotateCCW') rotatePiece(-1);
+  else if (type === 'hold') holdPiece();
   else if (type === 'softDrop') softDropPiece();
   else if (type === 'hardDrop') hardDropPiece();
 }
@@ -288,7 +321,10 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter') { e.preventDefault(); handleGameAction('confirm'); return; }
   if (e.key === 'Escape') { e.preventDefault(); handleGameAction('back'); return; }
   if (e.key === 'p' || e.key === 'P') { handleGameAction('pause'); return; }
-  if (e.key === 'n' || e.key === 'N') { handleGameAction('levelSkip'); return; }
+  if (e.key === 'x' || e.key === 'X') { if (!e.repeat) handleGameAction('rotateCW'); return; }
+  if (e.key === 'z' || e.key === 'Z') { if (!e.repeat) handleGameAction('rotateCCW'); return; }
+  if (e.key === 'c' || e.key === 'C' || e.key === 'Shift') { if (!e.repeat) handleGameAction('hold'); return; }
+  if (e.key === 'r' || e.key === 'R') { if (!e.repeat) handleGameAction('restart'); return; }
   if (e.key === ' ') {
     e.preventDefault();
     handleGameAction('hardDrop');
@@ -356,7 +392,7 @@ function loop(now) {
     onGameEnd(savedScore, false);
     startDeathAnim(savedBoard, () => {
       startGameOverAnim(savedBoard, savedScore, savedStats,
-        ()=>{ goToMenu(); requestAnimationFrame(loop); },
+        ()=>{ restartCurrentGame(); requestAnimationFrame(loop); },
         ()=>{ goToMenu(); requestAnimationFrame(loop); }
       );
     });
@@ -375,11 +411,8 @@ function loop(now) {
       const age = now - state.clearingRows.startTime;
       if (age >= 300) finishLineClear();
     } else {
-      if (now-state.lastFall>=state.fallDelay) {
-        state.lastFall=now;
-        const t={...state.piece,y:state.piece.y+1};
-        if(valid(state.board,t)) state.piece=t; else doLock();
-      }
+      if (lockDelayExpired(state,now)) doLock();
+      else if (now-state.lastFall>=state.fallDelay) gravityStep(state,now);
     }
     state.particles=state.particles.filter(p=>p.life>0);
     state.particles.forEach(p=>p.update());
