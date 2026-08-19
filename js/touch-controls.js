@@ -67,7 +67,7 @@ function installTouchControls({ canvas, dispatch }) {
           <div class="touch-gesture"><strong>↑</strong><span>Deslizá para HOLD</span></div>
         </div>
         <div class="touch-dialog-actions">
-          <button class="touch-dialog-button primary" data-tutorial-mode="gestures">JUGAR CON GESTOS</button>
+          <button class="touch-dialog-button" data-tutorial-mode="gestures">JUGAR CON GESTOS</button>
           <button class="touch-dialog-button" data-tutorial-mode="buttons">USAR BOTONES</button>
         </div>
       </div>
@@ -84,10 +84,15 @@ function installTouchControls({ canvas, dispatch }) {
         <div class="touch-pause-actions">
           <button class="touch-dialog-button touch-sound-toggle" data-action="mute">SONIDO</button>
           <button class="touch-dialog-button touch-danger touch-restart-request" data-touch-command="request-restart">REINICIAR</button>
+          <button class="touch-dialog-button touch-danger" data-touch-command="request-menu">MENÚ PRINCIPAL</button>
         </div>
         <div class="touch-restart-confirm">
           <button class="touch-dialog-button touch-danger" data-action="restart">SÍ, REINICIAR</button>
           <button class="touch-dialog-button" data-touch-command="cancel-restart">CANCELAR</button>
+        </div>
+        <div class="touch-menu-confirm">
+          <button class="touch-dialog-button touch-danger" data-action="menu">SÍ, IR AL MENÚ</button>
+          <button class="touch-dialog-button" data-touch-command="cancel-menu">CANCELAR</button>
         </div>
       </div>
     </div>
@@ -160,6 +165,11 @@ function installTouchControls({ canvas, dispatch }) {
       button.classList.toggle('is-selected', selected);
       button.setAttribute('aria-pressed', String(selected));
     });
+    root.querySelectorAll('[data-tutorial-mode]').forEach(button => {
+      const selected = button.dataset.tutorialMode === settings.mode;
+      button.classList.toggle('is-selected', selected);
+      button.setAttribute('aria-pressed', String(selected));
+    });
   }
 
   function setMode(mode) {
@@ -201,8 +211,9 @@ function installTouchControls({ canvas, dispatch }) {
     const commandButton = event.target.closest('[data-touch-command]');
     if (commandButton) {
       event.preventDefault();
-      if (commandButton.dataset.touchCommand === 'request-restart') pauseDialog.classList.add('is-confirming');
-      else pauseDialog.classList.remove('is-confirming');
+      pauseDialog.classList.remove('is-confirming-restart', 'is-confirming-menu');
+      if (commandButton.dataset.touchCommand === 'request-restart') pauseDialog.classList.add('is-confirming-restart');
+      else if (commandButton.dataset.touchCommand === 'request-menu') pauseDialog.classList.add('is-confirming-menu');
       return;
     }
 
@@ -211,7 +222,7 @@ function installTouchControls({ canvas, dispatch }) {
     event.preventDefault();
     event.stopPropagation();
     startActionButton(actionButton, event);
-    if (actionButton.dataset.action === 'mute') refresh(true);
+    if (['mute','pause','restart','menu'].includes(actionButton.dataset.action)) refresh(true);
   });
   root.addEventListener('pointerup', event => stopButton(event.pointerId));
   root.addEventListener('pointercancel', event => stopButton(event.pointerId));
@@ -396,7 +407,7 @@ function installTouchControls({ canvas, dispatch }) {
 
     if (!activeGame) stopAllButtons();
     if (!gameplayGesturesAllowed(ui)) stopGesture();
-    if (!pauseMenu) pauseDialog.classList.remove('is-confirming');
+    if (!pauseMenu) pauseDialog.classList.remove('is-confirming-restart', 'is-confirming-menu');
     soundButton.textContent = ui.muted ? 'SONIDO: NO' : 'SONIDO: SÍ';
     soundButton.setAttribute('aria-pressed', String(!ui.muted));
     syncModeButtons();
@@ -411,7 +422,7 @@ function installTouchControls({ canvas, dispatch }) {
   const controller = {
     getMode: () => settings.mode,
     setMode,
-    needsTutorial: () => isCoarse && settings.tutorialVersion < cfg.tutorialVersion,
+    needsTutorial: () => isCoarse,
     presentTutorial(onComplete) {
       if (!isCoarse) {
         if (onComplete) onComplete(settings.mode);

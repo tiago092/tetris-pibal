@@ -306,6 +306,13 @@ function handleGameAction(action) {
     return;
   }
   if (type === 'pause') { pauseGame(); return; }
+  if (type === 'menu') {
+    if (state && state.paused) {
+      goToMenu();
+      resizeCanvas();
+    }
+    return;
+  }
   if (type === 'restart') {
     if (state && state.over && window.restartFromGameOver) window.restartFromGameOver();
     else if (state && !state.over && !state.won) restartCurrentGame();

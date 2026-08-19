@@ -100,10 +100,18 @@ const path = require('path');
   const tutorialDone=await tutorial.page.evaluate(key => ({
     tutorial:inTouchTutorial,
     countdown:inCountdown,
+    willShowAgain:window.__touchControlsController.needsTutorial(),
     saved:JSON.parse(localStorage.getItem(key) || '{}'),
   }),touchStorageKey);
-  if (tutorialDone.tutorial || !tutorialDone.countdown || tutorialDone.saved.mode !== 'gestures' || tutorialDone.saved.tutorialVersion !== 1)
+  if (tutorialDone.tutorial || !tutorialDone.countdown || !tutorialDone.willShowAgain || tutorialDone.saved.mode !== 'gestures' || tutorialDone.saved.tutorialVersion !== 1)
     errors.push(`touch tutorial completion failed: ${JSON.stringify(tutorialDone)}`);
+  await tutorial.page.evaluate(() => {
+    inCountdown=false; inMenu=false; inDifficulty=true; inTouchTutorial=false;
+    startSelectedDifficulty();
+  });
+  const tutorialAgain=await tutorial.page.evaluate(() => ({ tutorial:inTouchTutorial,countdown:inCountdown }));
+  if (!tutorialAgain.tutorial || tutorialAgain.countdown)
+    errors.push(`touch tutorial was not shown on the next game: ${JSON.stringify(tutorialAgain)}`);
   await tutorial.context.close();
 
   const malformed=await preparePage(mobileOptions,false,'Malformed','{not-json');
@@ -268,7 +276,7 @@ const path = require('path');
   if (mutedAfter === mutedBefore) errors.push('pause sound toggle failed');
   await pause.page.evaluate(() => { state.score=4321; });
   await pause.page.locator('[data-touch-command="request-restart"]').click();
-  const confirming=await pause.page.locator('.touch-pause-dialog').evaluate(el => el.classList.contains('is-confirming'));
+  const confirming=await pause.page.locator('.touch-pause-dialog').evaluate(el => el.classList.contains('is-confirming-restart'));
   const scoreBeforeConfirm=await pause.page.evaluate(() => state.score);
   if (!confirming || scoreBeforeConfirm !== 4321) errors.push('restart confirmation did not protect current game');
   await pause.page.locator('.touch-restart-confirm [data-action="restart"]').click();
@@ -276,6 +284,20 @@ const path = require('path');
   const pauseRestarted=await pause.page.evaluate(() => ({ score:state.score,paused:state.paused }));
   if (pauseRestarted.score !== 0 || pauseRestarted.paused)
     errors.push(`confirmed touch restart failed: ${JSON.stringify(pauseRestarted)}`);
+  await pause.page.locator('.touch-pause').click();
+  await pause.page.waitForTimeout(150);
+  await pause.page.locator('[data-touch-command="request-menu"]').click();
+  const menuConfirming=await pause.page.locator('.touch-pause-dialog').evaluate(el => el.classList.contains('is-confirming-menu'));
+  const menuBeforeConfirm=await pause.page.evaluate(() => inMenu);
+  if (!menuConfirming || menuBeforeConfirm) errors.push('main-menu confirmation did not protect current game');
+  await pause.page.locator('.touch-menu-confirm [data-action="menu"]').click();
+  await pause.page.waitForTimeout(150);
+  const returnedToMenu=await pause.page.evaluate(() => ({
+    menu:inMenu,
+    pauseMenu:document.getElementById('touchControls').classList.contains('show-pause-menu'),
+  }));
+  if (!returnedToMenu.menu || returnedToMenu.pauseMenu)
+    errors.push(`touch main-menu action failed: ${JSON.stringify(returnedToMenu)}`);
   await pause.context.close();
 
   for (const viewport of [
