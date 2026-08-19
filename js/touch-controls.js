@@ -51,8 +51,7 @@ function installTouchControls({ canvas, dispatch }) {
         <button class="touch-btn touch-action touch-hold" data-action="hold" aria-label="Guardar pieza">HOLD</button>
       </div>
       <div class="touch-cluster touch-right-cluster">
-        <button class="touch-btn touch-action" data-action="rotateCCW" aria-label="Girar a la izquierda">&#8634;</button>
-        <button class="touch-btn touch-action" data-action="rotateCW" aria-label="Girar a la derecha">&#8635;</button>
+        <button class="touch-btn touch-action touch-rotate" data-action="rotateCW" aria-label="Girar">&#8635;</button>
         <button class="touch-btn touch-action" data-action="softDrop" data-repeat="true" aria-label="Bajar">&#9660;</button>
         <button class="touch-btn touch-action touch-hard" data-action="hardDrop" aria-label="Caída rápida">&#10515;</button>
       </div>

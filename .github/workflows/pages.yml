@@ -14,11 +14,12 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     environment: github-pages
     steps:
       - name: Checkout
@@ -34,7 +35,8 @@ jobs:
         run: npm ci
 
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        timeout-minutes: 10
+        run: npx playwright install --with-deps --only-shell chromium
 
       - name: Run tests
         run: npm test

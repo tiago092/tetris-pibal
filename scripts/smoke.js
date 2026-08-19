@@ -207,6 +207,16 @@ const path = require('path');
     JSON.stringify({ mode:'buttons',tutorialVersion:1 })
   );
   await buttons.page.waitForTimeout(180);
+  const mobileRotations=await buttons.page.evaluate(() => ({
+    clockwise:document.querySelectorAll('.touch-pad [data-action="rotateCW"]').length,
+    counterclockwise:document.querySelectorAll('.touch-pad [data-action="rotateCCW"]').length,
+  }));
+  if (mobileRotations.clockwise !== 1 || mobileRotations.counterclockwise !== 0)
+    errors.push(`mobile should expose one rotation button: ${JSON.stringify(mobileRotations)}`);
+  await buttons.page.evaluate(() => { state.piece=createPiece('T'); state.lastFall=performance.now(); });
+  await buttons.page.locator('.touch-pad [data-action="rotateCW"]').click();
+  const buttonRotation=await buttons.page.evaluate(() => state.piece.rot);
+  if (buttonRotation !== 1) errors.push(`single mobile rotation button failed: rot=${buttonRotation}`);
   await buttons.page.evaluate(() => { state.piece={ ...createPiece('T'),x:6 }; state.lastFall=performance.now(); });
   const leftButton=buttons.page.locator('[data-action="left"]');
   await leftButton.dispatchEvent('pointerdown',{ pointerId:21,pointerType:'touch',isPrimary:true,buttons:1 });
