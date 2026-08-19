@@ -140,6 +140,7 @@ function beginSelectedCountdown() {
   inTouchTutorial = false;
   inCountdown = true;
   countdownStart = performance.now(); countdownVal = 5;
+  resetLevelMusicRotation();
   state = createState();
   unlockGameAudio();
   checkMusic(state.level);
@@ -215,6 +216,7 @@ function holdPiece() {
 
 function restartCurrentGame() {
   if (!state || inMenu || inNameEntry || inDifficulty || inLeaderboard || inCredits || inCountdown || inTouchTutorial) return;
+  resetLevelMusicRotation();
   state = createState();
   explosionParticles = [];
   shake = { intensity:0, duration:0, elapsed:0 };

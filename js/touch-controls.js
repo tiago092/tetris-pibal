@@ -7,6 +7,7 @@ function installTouchControls({ canvas, dispatch }) {
   const cfg = TOUCH_CONFIG;
   const isCoarse = window.matchMedia('(pointer: coarse)').matches;
   const validModes = new Set(['gestures', 'buttons']);
+  const doubleTapZoomMaxMs = 350;
 
   function loadSettings() {
     try {
@@ -111,6 +112,26 @@ function installTouchControls({ canvas, dispatch }) {
 
   function isTouchViewport() {
     return isCoarse || window.innerWidth <= 900;
+  }
+
+  function isGameTouchTarget(target) {
+    return target instanceof Element && !!target.closest('#c, #touchControls, #debugLevelButton');
+  }
+
+  // WebKit puede conservar el zoom por doble toque en capas posicionadas aunque
+  // touch-action sea none. Cancelamos solo la acción nativa; los pointerup que
+  // ejecutan el juego ya se entregaron y dos toques rápidos siguen siendo dos acciones.
+  if (isCoarse) {
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', event => {
+      if (!isGameTouchTarget(event.target) || event.touches.length || event.changedTouches.length !== 1) return;
+      const now = performance.now();
+      if (lastTouchEnd && now - lastTouchEnd <= doubleTapZoomMaxMs) event.preventDefault();
+      lastTouchEnd = now;
+    }, { capture:true, passive:false });
+    document.addEventListener('dblclick', event => {
+      if (isGameTouchTarget(event.target)) event.preventDefault();
+    }, { capture:true, passive:false });
   }
 
   function vibrate() {

@@ -54,6 +54,43 @@ const path = require('path');
   }));
   if (initial.queue !== 1 || initial.bag !== 5) errors.push(`unexpected initial queue/bag: ${JSON.stringify(initial)}`);
 
+  const musicRotation=await desktop.page.evaluate(() => {
+    resetLevelMusicRotation();
+    const first=resolveLevelMusic(0,()=>0);
+    const repeated=resolveLevelMusic(0,()=>0.99);
+    const queueBeforeFixed=randomMusicQueue.length;
+    const fixed=resolveLevelMusic(2,()=>0);
+    const queueAfterFixed=randomMusicQueue.length;
+    const firstCycle=[first,resolveLevelMusic(1,()=>0),resolveLevelMusic(3,()=>0),resolveLevelMusic(4,()=>0)];
+    const nextCycle=resolveLevelMusic(5,()=>0);
+    stopLevelBgAudio();
+    applyLevelBg(4);
+    const levelFiveAudio=levelBgAudio.getAttribute('src');
+    applyLevelBg(0);
+    resetLevelMusicRotation();
+    return {
+      pool:[...LEVEL_MUSIC_POOL],
+      fixed,
+      fixedDidNotConsume:queueBeforeFixed === queueAfterFixed,
+      repeated,
+      firstCycle,
+      nextCycle,
+      levelFiveAudio,
+    };
+  });
+  if (musicRotation.fixed !== 'assets/sound/mike.mp3' || !musicRotation.fixedDidNotConsume)
+    errors.push(`level 3 music changed or consumed random queue: ${JSON.stringify(musicRotation)}`);
+  if (musicRotation.repeated !== musicRotation.firstCycle[0])
+    errors.push(`music selection was not stable within a level: ${JSON.stringify(musicRotation)}`);
+  if (new Set(musicRotation.firstCycle).size !== musicRotation.pool.length ||
+      musicRotation.firstCycle.some(src => !musicRotation.pool.includes(src)))
+    errors.push(`music repeated before the pool was exhausted: ${JSON.stringify(musicRotation)}`);
+  if (!musicRotation.pool.includes(musicRotation.nextCycle) ||
+      musicRotation.nextCycle === musicRotation.firstCycle.at(-1))
+    errors.push(`music repeated across shuffle boundary: ${JSON.stringify(musicRotation)}`);
+  if (musicRotation.levelFiveAudio)
+    errors.push(`level 5 secondary audio is still active: ${JSON.stringify(musicRotation)}`);
+
   await desktop.page.evaluate(() => window.handleGameAction('hold'));
   const held=await desktop.page.evaluate(() => ({
     held:state.heldPiece && state.heldPiece.shape,
@@ -66,10 +103,26 @@ const path = require('path');
 
   await desktop.page.keyboard.press('KeyX');
   await desktop.page.keyboard.press('KeyZ');
-  await desktop.page.evaluate(() => { state.score=1234; });
+  await desktop.page.evaluate(() => {
+    state.score=1234;
+    levelMusicSelections[0]='sentinel';
+    randomMusicQueue=['sentinel'];
+    lastRandomMusic='sentinel';
+  });
   await desktop.page.keyboard.press('KeyR');
-  const restarted=await desktop.page.evaluate(() => ({ score:state.score,player:playerName,queue:state.nextQueue.length }));
-  if (restarted.score !== 0 || restarted.player !== 'Smoke' || restarted.queue !== 1)
+  const restarted=await desktop.page.evaluate(() => ({
+    score:state.score,
+    player:playerName,
+    queue:state.nextQueue.length,
+    musicPool:[...LEVEL_MUSIC_POOL],
+    musicQueue:randomMusicQueue.length,
+    musicSelections:levelMusicSelections.length,
+    selectedMusic:levelMusicSelections[0],
+    lastRandomMusic,
+  }));
+  if (restarted.score !== 0 || restarted.player !== 'Smoke' || restarted.queue !== 1 ||
+      restarted.musicQueue !== restarted.musicPool.length-1 || restarted.musicSelections !== 1 ||
+      !restarted.musicPool.includes(restarted.selectedMusic) || restarted.lastRandomMusic !== restarted.selectedMusic)
     errors.push(`restart failed: ${JSON.stringify(restarted)}`);
 
   const levelBefore=await desktop.page.evaluate(() => state.level);
@@ -137,10 +190,18 @@ const path = require('path');
       pause:root.classList.contains('show-pause'),
       buttons:root.classList.contains('show-buttons'),
       mode:window.__touchControlsController.getMode(),
+      touchActions:{
+        html:getComputedStyle(document.documentElement).touchAction,
+        body:getComputedStyle(document.body).touchAction,
+        canvas:getComputedStyle(document.getElementById('c')).touchAction,
+        pause:getComputedStyle(root.querySelector('.touch-pause')).touchAction,
+      },
     };
   });
   if (!gestureUi.visible || !gestureUi.pause || gestureUi.buttons || gestureUi.mode !== 'gestures')
     errors.push(`gesture mode UI failed: ${JSON.stringify(gestureUi)}`);
+  if (Object.values(gestureUi.touchActions).some(value => value !== 'none'))
+    errors.push(`touch-action does not disable viewport gestures: ${JSON.stringify(gestureUi.touchActions)}`);
 
   const canvasBox=await gesture.page.locator('#c').boundingBox();
   const leftTapX=canvasBox.x+canvasBox.width*0.25;
@@ -156,6 +217,32 @@ const path = require('path');
   const rightRotation=await gesture.page.evaluate(() => state.piece.rot);
   if (leftRotation !== 3 || rightRotation !== 1)
     errors.push(`gesture rotations failed: ${JSON.stringify({ leftRotation,rightRotation })}`);
+
+  await gesture.page.evaluate(() => { state.piece=createPiece('T'); state.lastFall=performance.now(); });
+  await dispatchTouch(gesture.page,'#c','pointerdown',rightTapX,tapY,17);
+  await dispatchTouch(gesture.page,'#c','pointerup',rightTapX,tapY,17);
+  const firstTouchEndPrevented=await gesture.page.evaluate(() => {
+    const event=new Event('touchend',{ bubbles:true,cancelable:true });
+    Object.defineProperties(event,{ touches:{ value:[] },changedTouches:{ value:[{}] } });
+    document.getElementById('c').dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+  await dispatchTouch(gesture.page,'#c','pointerdown',rightTapX,tapY,18);
+  await dispatchTouch(gesture.page,'#c','pointerup',rightTapX,tapY,18);
+  const doubleTap=await gesture.page.evaluate(() => {
+    const touchEnd=new Event('touchend',{ bubbles:true,cancelable:true });
+    Object.defineProperties(touchEnd,{ touches:{ value:[] },changedTouches:{ value:[{}] } });
+    document.getElementById('c').dispatchEvent(touchEnd);
+    const doubleClick=new MouseEvent('dblclick',{ bubbles:true,cancelable:true });
+    document.getElementById('c').dispatchEvent(doubleClick);
+    return {
+      rotation:state.piece.rot,
+      touchEndPrevented:touchEnd.defaultPrevented,
+      doubleClickPrevented:doubleClick.defaultPrevented,
+    };
+  });
+  if (firstTouchEndPrevented || !doubleTap.touchEndPrevented || !doubleTap.doubleClickPrevented || doubleTap.rotation !== 2)
+    errors.push(`double-tap zoom guard failed: ${JSON.stringify({ firstTouchEndPrevented,...doubleTap })}`);
 
   await gesture.page.evaluate(() => { state.piece={ ...createPiece('T'),x:1 }; state.lastFall=performance.now(); });
   const dragStartX=canvasBox.x+canvasBox.width*0.35;
@@ -402,13 +489,38 @@ const path = require('path');
     errors.push(`debug victory transition incomplete: ${JSON.stringify(debugWin)}`);
   await debug.context.close();
 
+  const defeat=await preparePage({ viewport:{ width:800,height:900 } },false,'DefeatSmoke');
+  await defeat.page.evaluate(() => {
+    unlockGameAudio();
+    checkMusic(state.level);
+    state.over=true;
+  });
+  await defeat.page.waitForFunction(() => typeof window.restartFromGameOver === 'function',null,{ timeout:7000 });
+  const gameOver=await defeat.page.evaluate(() => ({
+    musicStopped:musicEl===null,
+    videoPlaying:!gameOverVideo.paused,
+  }));
+  if (!gameOver.musicStopped || !gameOver.videoPlaying)
+    errors.push(`defeat transition incomplete: ${JSON.stringify(gameOver)}`);
+  await defeat.page.evaluate(() => window.restartFromGameOver());
+  await defeat.page.waitForTimeout(150);
+  const defeatRestart=await defeat.page.evaluate(() => ({
+    over:state.over,
+    level:state.level,
+    selectedMusic:levelMusicSelections[0],
+    validMusic:LEVEL_MUSIC_POOL.includes(levelMusicSelections[0]),
+  }));
+  if (defeatRestart.over || defeatRestart.level !== 0 || !defeatRestart.validMusic)
+    errors.push(`defeat restart failed: ${JSON.stringify(defeatRestart)}`);
+  await defeat.context.close();
+
   await browser.close();
 
   if (errors.length) {
     console.error(errors.join('\n'));
     process.exit(1);
   }
-  console.log('OK: desktop, touch modes/layout and debug-victory gameplay smoke tests');
+  console.log('OK: desktop, touch modes/layout, and victory/defeat gameplay smoke tests');
 })().catch(error => {
   console.error(error.stack || error);
   process.exit(1);

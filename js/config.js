@@ -61,6 +61,14 @@ const SOUND_CONFIG = {
   defeatSong:'assets/sound/defeatsong.mp3',
 };
 
+// ---- Música aleatoria de los niveles ----
+const LEVEL_MUSIC_POOL = [
+  'assets/sound/enlabirrafest.mp3',
+  'assets/sound/cacho.mp3',
+  'assets/sound/elsemidios-rmx.mp3',
+  'assets/sound/voysoloska.mp3',
+];
+
 // ---- Niveles (índice 0 = nivel 1) ----
 // Campos de bg:
 //   type      : 'image' | 'video'
@@ -73,8 +81,8 @@ const SOUND_CONFIG = {
 //   nextAudio : (video) archivo de audio que suena junto a nextVideo (loop)
 //   keepMusic : (video) true = reproducir música del nivel al mismo tiempo que el video
 //
-// Campos de music:
-//   src : ruta del mp3, null = sin música (usa audio del video)
+// Campo music:
+//   'random' = elegir del repertorio, ruta = pista fija, null = sin música
 //
 // Campos de hud: colores del panel lateral durante ese nivel
 const LEVELS = [
@@ -84,7 +92,7 @@ const LEVELS = [
     blockStyle: 'fire',
     opacity: 0.45,
     tint:    'rgba(20,10,0,0.15)',
-    music:   'assets/sound/enlabirrafest.mp3',
+    music:   'random',
     border:  ['#5a3a10', '#a07828'],
     grid:    'rgba(255,200,100,0.07)',
     hud:     { label:'#c8a050', value:'#ffe88c', panel:'rgba(60,35,5,0.5)', border:'#7a5520', title:'#ffcc44' },
@@ -95,7 +103,7 @@ const LEVELS = [
     blockStyle: 'neon',
     opacity: 0.40,
     tint:    'rgba(20,0,50,0.20)',
-    music:   'assets/sound/cacho.mp3',
+    music:   'random',
     border:  ['#3a1a6a', '#9a50ff'],
     grid:    'rgba(180,100,255,0.07)',
     hud:     { label:'#b878ff', value:'#e0b0ff', panel:'rgba(30,0,60,0.55)', border:'#7030c0', title:'#cc88ff' },
@@ -117,19 +125,18 @@ const LEVELS = [
     blockStyle: 'metal',
     opacity: 0.30,
     tint:    'rgba(0,40,80,0.30)',
-    music:   'assets/sound/elsemidios-rmx.mp3',
+    music:   'random',
     border:  ['#003060', '#0090ff'],
     grid:    'rgba(0,150,255,0.08)',
     hud:     { label:'#50b8ff', value:'#c0e8ff', panel:'rgba(0,20,50,0.60)', border:'#0060c0', title:'#40a0ff' },
   },
   {
     name:    'Guillenada',
-    bg:      { type: 'video', src: 'assets/video/guillenada.mp4', loop: true, muted: true,
-               nextAudio: 'assets/video/festincumbia.mp4' },
+    bg:      { type: 'video', src: 'assets/video/guillenada.mp4', loop: true, muted: true },
     blockStyle: 'holo',
     opacity: 0.38,
     tint:    null,
-    music:   null,
+    music:   'random',
     border:  ['#7a0050', '#ff40b0'],
     grid:    'rgba(255,80,180,0.08)',
     hud:     { label:'#ff70c0', value:'#ffe0f4', panel:'rgba(60,0,30,0.55)', border:'#cc2080', title:'#ff50b8' },
@@ -141,7 +148,7 @@ const LEVELS = [
     blockStyle: 'psycho',
     opacity: 0.38,
     tint:    null,
-    music:   'assets/sound/voysoloska.mp3',
+    music:   'random',
     border:  ['#600000', '#ff3030'],
     grid:    'rgba(255,60,60,0.08)',
     hud:     { label:'#ff8080', value:'#ffe0e0', panel:'rgba(50,0,0,0.60)', border:'#c00000', title:'#ff4040' },

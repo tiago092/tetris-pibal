@@ -6,6 +6,9 @@ let musicUnlocked = false;
 let fadeInterval = null;
 let musicMuted = false;
 let musicPlayToken = 0;
+let randomMusicQueue = [];
+let levelMusicSelections = [];
+let lastRandomMusic = null;
 
 function unlockAudio() {
   if (audioCtx) {
@@ -153,6 +156,38 @@ function playSound(el) {
   el.play().catch(()=>{});
 }
 
+function shuffleLevelMusic(random=Math.random) {
+  const queue = [...LEVEL_MUSIC_POOL];
+  for (let i=queue.length-1; i>0; i--) {
+    const j = Math.floor(random() * (i+1));
+    [queue[i], queue[j]] = [queue[j], queue[i]];
+  }
+  if (queue.length > 1 && queue[0] === lastRandomMusic) {
+    const swapIndex = queue.findIndex((src,index) => index > 0 && src !== lastRandomMusic);
+    if (swapIndex > 0) [queue[0], queue[swapIndex]] = [queue[swapIndex], queue[0]];
+  }
+  return queue;
+}
+
+function resetLevelMusicRotation() {
+  randomMusicQueue = [];
+  levelMusicSelections = [];
+  lastRandomMusic = null;
+}
+
+function resolveLevelMusic(level, random=Math.random) {
+  const configuredMusic = getTheme(level).music;
+  if (configuredMusic !== 'random') return configuredMusic;
+  if (Object.prototype.hasOwnProperty.call(levelMusicSelections,level)) {
+    return levelMusicSelections[level];
+  }
+  if (!randomMusicQueue.length) randomMusicQueue = shuffleLevelMusic(random);
+  const selectedMusic = randomMusicQueue.shift() || null;
+  levelMusicSelections[level] = selectedMusic;
+  if (selectedMusic) lastRandomMusic = selectedMusic;
+  return selectedMusic;
+}
+
 function stopMusic() {
   musicPlayToken++;
   if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null; }
@@ -177,7 +212,7 @@ function playMusic(level) {
 
   if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null; }
 
-  const src = getTheme(level).music;
+  const src = resolveLevelMusic(level);
   if (!src) { stopMusic(); return; }
   const incoming = new Audio(src);
   incoming.loop = true;
