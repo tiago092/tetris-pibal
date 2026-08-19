@@ -1,126 +1,134 @@
 # Deploy
 
-Tetris Pibal is a static site. There is no frontend bundler.
+Tetris Pibal runs as a static site without a frontend bundler. Its build command
+copies the browser files to `dist/` and injects the public Supabase configuration
+used by the online ranking.
 
-## 1. Prepare Supabase
+## 1. Prerequisites
 
-Create or connect a Supabase project for the online ranking.
+- Node.js 24, matching `.nvmrc`
+- npm
+- A Supabase project for the online ranking
 
-This repo does not migrate scores. It only defines the table, constraints, RLS,
-and policies.
+Install the locked dependencies and the Playwright browser used by the smoke
+test:
 
-In the Supabase Dashboard:
+```sh
+npm ci
+npx playwright install chromium
+```
 
-1. Create a project.
-2. Copy:
-   - `Project URL`
-   - `anon public key`
+## 2. Configure the environment
 
-Create the table and policies:
-
-1. Open `supabase/migrations/20260517000000_create_scores.sql`.
-2. Copy the full SQL.
-3. In Supabase, go to `SQL Editor`.
-4. Paste and run it.
-
-That SQL:
-
-- creates `public.scores` if it does not exist;
-- enables RLS;
-- allows public ranking reads;
-- allows valid score inserts and updates;
-- keeps one score row per player name;
-- removes duplicated player names, keeping the highest score;
-- does not insert data.
-
-Run this SQL again whenever the migration changes. It is written to be safe for
-an existing `public.scores` table.
-
-## 2. Connect the game
-
-For local builds, copy `.env.example` to `.env` and fill it in:
+Copy `.env.example` to `.env` and replace its placeholders:
 
 ```txt
 SUPABASE_URL=https://your-project-ref.supabase.co
 SUPABASE_ANON_KEY=your-public-anon-key
+SUPABASE_PROJECT_REF=your-project-ref
+SUPABASE_DB_PASSWORD=
 ```
 
-`.env` is only for your machine and must stay ignored by git. The browser never
-loads `.env` directly. The build step converts `SUPABASE_URL` and
-`SUPABASE_ANON_KEY` into the public file `dist/js/supabase-config.js`.
+`SUPABASE_URL` and `SUPABASE_ANON_KEY` configure the game build.
+`SUPABASE_PROJECT_REF` is used by `npm run supabase:link`.
+`SUPABASE_DB_PASSWORD` is optional and is only passed to the Supabase CLI when
+set.
 
-## 3. Verify
+`.env` is local-only and ignored by git. The browser never reads it directly.
 
-```powershell
-npm install
+## 3. Apply the Supabase schema
+
+The preferred workflow uses the versioned migration through the Supabase CLI:
+
+```sh
+npm run supabase:login
+npm run supabase:link
+npm run supabase:push
+```
+
+The migration creates `public.scores`, constraints, indexes, grants, and RLS
+policies. It also deduplicates existing player names, keeping the best score.
+It does not copy scores between Supabase projects or insert seed scores.
+
+As a manual alternative, open each pending file in `supabase/migrations/` in
+timestamp order, copy its complete SQL, and run it in the Supabase Dashboard SQL
+Editor. Record which files were applied; use new forward migrations for later
+database changes instead of silently editing production history.
+
+## 4. Test and build
+
+Run the automated checks:
+
+```sh
 npm test
 ```
 
-## 4. Prepare the static output
+Prepare the static output:
 
-```powershell
+```sh
 npm run build
 ```
 
-This creates `dist/` with:
+The build copies `index.html`, `manifest.webmanifest`, `assets/`, and `js/` into
+`dist/`. When both Supabase variables are present, it writes them to
+`dist/js/supabase-config.js`.
 
-- `index.html`
-- `manifest.webmanifest`
-- `assets/`
-- `js/`
+If neither `SUPABASE_URL` nor `SUPABASE_ANON_KEY` is set, the build succeeds with
+a warning and produces a local-ranking-only deployment. If only one is set, the
+build fails. Treat a local-only warning as a failed release when online ranking
+is required.
 
 ## 5. Deploy to GitHub Pages
 
-This repo includes `.github/workflows/pages.yml`. On every push to `main` or
-`master`, GitHub Actions runs the tests, builds `dist/`, and deploys it to
-GitHub Pages.
+`.github/workflows/pages.yml` runs on pushes to `main` or `master`, and can also
+be started manually. It installs dependencies and Chromium, runs the tests,
+builds `dist/`, and deploys it to GitHub Pages.
 
-Add these repository secrets in GitHub:
+Add these repository secrets under `Settings` -> `Secrets and variables` ->
+`Actions`:
 
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 
-GitHub path:
+Then set `Settings` -> `Pages` -> `Source` to `GitHub Actions` and push to the
+deployment branch. This repository currently uses `master`.
 
-1. Open the repo on GitHub.
-2. Go to `Settings` -> `Secrets and variables` -> `Actions`.
-3. Add both secrets.
-4. Go to `Settings` -> `Pages`.
-5. Set `Source` to `GitHub Actions`.
-6. Push to your deploy branch (`master` in this local repo).
+The Pages workflow does not apply database migrations. Run the Supabase CLI flow
+or the manual SQL flow separately whenever the migration changes.
 
-Do not add `.env` to git. GitHub Actions reads the secrets and generates
-`dist/js/supabase-config.js` during `npm run build`.
+## 6. Other static hosts
 
-## 6. Other static hosting
-
-Upload the contents of `dist/` to any static host:
-
-- Netlify
-- Vercel
-- Cloudflare Pages
-- S3/CloudFront
-- any HTTP server
-
-Hosting settings:
+For Netlify, Vercel, Cloudflare Pages, S3/CloudFront, or another static host, use:
 
 - Build command: `npm run build`
-- Publish/output directory: `dist`
-- Node version: `24`
+- Publish directory: `dist`
+- Node.js version: `24`
+- Environment variables: `SUPABASE_URL` and `SUPABASE_ANON_KEY`
 
-## 7. Manual smoke test
+Upload the contents of `dist/`, not the repository root and never `.env`.
 
-After deploy:
+## 7. Post-deploy verification
 
-1. Open the public URL.
-2. Finish a game.
-3. Confirm the score appears in Supabase table `public.scores`.
-4. Open the in-game ranking and confirm it loads.
+1. Open the public URL and check that the game loads without console errors.
+2. Verify keyboard controls on desktop and touch controls on a mobile or
+   coarse-pointer viewport.
+3. Finish a game with a new player name and confirm the row appears in
+   `public.scores`.
+4. Beat that score using the same name and confirm the existing row is updated.
+5. Open the in-game ranking and confirm the remote top scores load.
+6. Check that `manifest.webmanifest`, its icons, audio, images, and video load
+   from the deployed subpath.
 
-## Important
+## Troubleshooting and security
 
-Do not upload `.env`. Only `dist/js/supabase-config.js` is published, and it
-contains public data required by the web app.
-
-The anon key is public in a web app. That is fine while RLS is enabled and the
-policies match the versioned SQL.
+- If the game reports a local ranking, inspect the deployment environment and
+  the generated `dist/js/supabase-config.js`.
+- If inserts work but improving an existing score fails, apply all pending
+  migrations and inspect the Supabase RLS policy for updates.
+- If the smoke test cannot find Chromium, run `npx playwright install chromium`.
+- The anon key is expected to be public in a browser application. Do not use a
+  service-role key. Data protection depends on the versioned constraints and RLS
+  policies remaining enabled.
+- To roll back frontend code, redeploy a known-good commit. Prefer a new forward
+  migration for database corrections instead of editing an already-applied
+  migration in production history.
