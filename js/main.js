@@ -5,6 +5,7 @@ let inDifficulty = false;
 let inLeaderboard = false;
 let inCredits     = false;
 let inCountdown  = false;
+let inTouchTutorial = false;
 let countdownVal = 5;
 let countdownStart = 0;
 let menuOption   = 0;
@@ -43,6 +44,7 @@ function getShakeOffset(dt) {
 const canvas = document.getElementById('c');
 const ctx = canvas.getContext('2d');
 const debugLevelButton = document.getElementById('debugLevelButton');
+let touchControls = null;
 canvas.width = W; canvas.height = H;
 
 // ---- Input HTML para nombre ----
@@ -69,12 +71,25 @@ Object.assign(nameInput.style, {
 document.body.appendChild(nameInput);
 
 function resizeCanvas() {
-  const scaleX = window.innerWidth  / W;
-  const controlsReserve = document.body.classList.contains('touch-game-active') ? 150 : 0;
-  const scaleY = Math.max(0.2, (window.innerHeight - controlsReserve) / H);
-  const scale  = Math.min(scaleX, scaleY);
-  canvas.style.width  = Math.floor(W * scale) + 'px';
-  canvas.style.height = Math.floor(H * scale) + 'px';
+  const bodyStyle = getComputedStyle(document.body);
+  const cssPx = name => Number.parseFloat(bodyStyle.getPropertyValue(name)) || 0;
+  const safeTop = cssPx('padding-top');
+  const safeRight = cssPx('padding-right');
+  const safeBottom = cssPx('padding-bottom');
+  const safeLeft = cssPx('padding-left');
+  const touchInsets = touchControls ? touchControls.getLayoutInsets() : { top:0, bottom:0 };
+  const top = safeTop + touchInsets.top;
+  const bottom = Math.max(safeBottom, touchInsets.bottom);
+  const availableWidth = Math.max(1, window.innerWidth - safeLeft - safeRight);
+  const availableHeight = Math.max(1, window.innerHeight - top - bottom);
+  const scale = Math.min(availableWidth / W, availableHeight / H);
+  const width = Math.max(1, Math.floor(W * scale));
+  const height = Math.max(1, Math.floor(H * scale));
+  canvas.style.position = 'fixed';
+  canvas.style.width = width + 'px';
+  canvas.style.height = height + 'px';
+  canvas.style.left = Math.floor(safeLeft + (availableWidth - width) / 2) + 'px';
+  canvas.style.top = Math.floor(top + (availableHeight - height) / 2) + 'px';
   const rect = canvas.getBoundingClientRect();
   nameInput.style.left = (rect.left + rect.width  / 2) + 'px';
   nameInput.style.top  = (rect.top  + rect.height * 0.565) + 'px';
@@ -121,14 +136,27 @@ function selectMenuOption() {
   }
 }
 
-function startSelectedDifficulty() {
-  currentDiff = DIFFICULTIES[diffSelected];
-  inDifficulty = false; inCountdown = true;
+function beginSelectedCountdown() {
+  inTouchTutorial = false;
+  inCountdown = true;
   countdownStart = performance.now(); countdownVal = 5;
-  stopIntroMusic();
   state = createState();
   unlockGameAudio();
   checkMusic(state.level);
+  resizeCanvas();
+}
+
+function startSelectedDifficulty() {
+  currentDiff = DIFFICULTIES[diffSelected];
+  inDifficulty = false;
+  inCountdown = false;
+  stopIntroMusic();
+  if (touchControls && touchControls.needsTutorial()) {
+    inTouchTutorial = true;
+    touchControls.presentTutorial(() => beginSelectedCountdown());
+    return;
+  }
+  beginSelectedCountdown();
 }
 
 function pauseGame() {
@@ -186,7 +214,7 @@ function holdPiece() {
 }
 
 function restartCurrentGame() {
-  if (!state || inMenu || inNameEntry || inDifficulty || inLeaderboard || inCredits || inCountdown) return;
+  if (!state || inMenu || inNameEntry || inDifficulty || inLeaderboard || inCredits || inCountdown || inTouchTutorial) return;
   state = createState();
   explosionParticles = [];
   shake = { intensity:0, duration:0, elapsed:0 };
@@ -195,6 +223,7 @@ function restartCurrentGame() {
 }
 
 function handleGameTap(x, y) {
+  if (inTouchTutorial) return;
   if (inMenu) {
     if (!menuUnlocked) { startMenuAudio(); return; }
     for (let i = 0; i < MENU_OPTIONS.length; i++) {
@@ -235,6 +264,7 @@ function handleGameAction(action) {
     }
     return;
   }
+  if (inTouchTutorial) return;
   if (type === 'mute') { toggleMute(); return; }
   if (type === 'back') { goBack(); return; }
   if (type === 'tap') { handleGameTap(action.x, action.y); return; }
@@ -294,9 +324,10 @@ function handleGameAction(action) {
 window.handleGameAction = handleGameAction;
 window.getGameUiState = function getGameUiState() {
   return {
-    inMenu, inNameEntry, inDifficulty, inLeaderboard, inCredits, inCountdown,
-    inGame: !inMenu && !inNameEntry && !inDifficulty && !inLeaderboard && !inCredits && !inCountdown,
+    inMenu, inNameEntry, inDifficulty, inLeaderboard, inCredits, inCountdown, inTouchTutorial,
+    inGame: !inMenu && !inNameEntry && !inDifficulty && !inLeaderboard && !inCredits && !inCountdown && !inTouchTutorial,
     menuUnlocked,
+    muted: musicMuted,
     paused: !!(state && state.paused),
     over: !!(state && state.over),
     won: !!(state && state.won),
@@ -328,7 +359,7 @@ nameInput.addEventListener('keydown', e => {
 
 // ---- Input: teclado ----
 document.addEventListener('keydown', e => {
-  if (inNameEntry) return;
+  if (inNameEntry || inTouchTutorial) return;
   if ((e.key === 'm' || e.key === 'M') && document.activeElement !== nameInput) { handleGameAction('mute'); return; }
   if (e.key === 'ArrowUp') { handleGameAction('up'); return; }
   if (e.key === 'ArrowDown') { handleGameAction(inMenu || inDifficulty ? 'down' : 'softDrop'); return; }
@@ -354,7 +385,7 @@ window.addEventListener('pointerdown', () => {
 
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) {
-    if (state && !state.over && !state.won && !state.paused && !inMenu && !inNameEntry && !inDifficulty && !inLeaderboard && !inCredits && !inCountdown) {
+    if (state && !state.over && !state.won && !state.paused && !inMenu && !inNameEntry && !inDifficulty && !inLeaderboard && !inCredits && !inCountdown && !inTouchTutorial) {
       state.paused = true;
     }
     if (musicEl) musicEl.pause();
@@ -368,7 +399,8 @@ document.addEventListener('visibilitychange', () => {
 });
 
 if (window.installTouchControls) {
-  window.installTouchControls({ canvas, dispatch: handleGameAction });
+  touchControls = window.installTouchControls({ canvas, dispatch: handleGameAction });
+  resizeCanvas();
 }
 
 // ---- Game loop ----
@@ -379,12 +411,13 @@ function loop(now) {
 
   if (debugLevelButton) {
     debugLevelButton.hidden = !DEBUG_MODE || inMenu || inNameEntry || inDifficulty ||
-      inLeaderboard || inCredits || inCountdown || !state || state.paused || state.over || state.won;
+      inLeaderboard || inCredits || inCountdown || inTouchTutorial || !state || state.paused || state.over || state.won;
   }
 
   if (inMenu)        { drawMenu(now);        requestAnimationFrame(loop); return; }
   if (inNameEntry)   { drawNameEntry();      requestAnimationFrame(loop); return; }
   if (inDifficulty)  { drawDifficulty();     requestAnimationFrame(loop); return; }
+  if (inTouchTutorial) { drawDifficulty();   requestAnimationFrame(loop); return; }
   if (inLeaderboard) { drawLeaderboard();    requestAnimationFrame(loop); return; }
   if (inCredits)     { drawCredits();        requestAnimationFrame(loop); return; }
   if (inCountdown)   { drawCountdown(now);   requestAnimationFrame(loop); return; }

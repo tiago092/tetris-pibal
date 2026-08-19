@@ -58,6 +58,8 @@
     #debugLevelButton:active { transform: translateY(1px); }
     #debugLevelButton[hidden] { display: none; }
     #touchControls {
+      --touch-size: clamp(56px, 16vw, 68px);
+      --touch-gap: 8px;
       display: none;
       pointer-events: none;
       position: fixed;
@@ -65,54 +67,47 @@
       z-index: 20;
       font-family: monospace;
     }
-    #touchControls.is-visible {
-      display: block;
-    }
-    .touch-top,
-    .touch-pad {
+    #touchControls.is-visible { display: block; }
+    .touch-top {
       position: absolute;
-      left: max(12px, env(safe-area-inset-left));
-      right: max(12px, env(safe-area-inset-right));
+      top: max(10px, env(safe-area-inset-top));
+      left: max(10px, env(safe-area-inset-left));
+      right: max(10px, env(safe-area-inset-right));
+      display: flex;
+      align-items: center;
+      gap: 10px;
       pointer-events: none;
     }
-    .touch-top {
-      top: max(10px, env(safe-area-inset-top));
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-    }
     .touch-pad {
+      position: absolute;
       bottom: max(12px, env(safe-area-inset-bottom));
+      left: max(8px, env(safe-area-inset-left));
+      right: max(8px, env(safe-area-inset-right));
       display: none;
       align-items: end;
       justify-content: space-between;
-      gap: 16px;
+      gap: var(--touch-gap);
+      pointer-events: none;
     }
-    #touchControls.show-game .touch-pad {
-      display: flex;
-    }
+    #touchControls.show-buttons .touch-pad { display: flex; }
     .touch-cluster {
       display: grid;
-      gap: 10px;
-    }
-    .touch-left-cluster {
-      grid-template-columns: repeat(2, 64px);
-    }
-    .touch-right-cluster {
-      grid-template-columns: repeat(2, 58px);
+      grid-template-columns: repeat(2, var(--touch-size));
+      gap: var(--touch-gap);
     }
     .touch-btn {
       pointer-events: auto;
       border: 1px solid rgba(255,255,255,0.35);
-      border-radius: 8px;
+      border-radius: 12px;
       background: linear-gradient(180deg, rgba(55,58,76,0.88), rgba(18,20,34,0.92));
       color: #f0f2ff;
-      min-width: 52px;
-      min-height: 46px;
+      min-width: 48px;
+      min-height: 48px;
       padding: 0 12px;
       font: bold 18px monospace;
       box-shadow: 0 8px 18px rgba(0,0,0,0.36), inset 0 1px 0 rgba(255,255,255,0.18);
       text-shadow: 0 2px 4px rgba(0,0,0,0.7);
+      touch-action: none;
     }
     .touch-btn.is-pressed {
       transform: translateY(1px) scale(0.98);
@@ -120,31 +115,154 @@
       color: #ffe600;
     }
     .touch-action {
-      width: 64px;
-      height: 58px;
+      width: var(--touch-size);
+      height: var(--touch-size);
       font-size: 25px;
     }
-    .touch-hard {
-      color: #ffe600;
-    }
+    .touch-hard { color: #ffe600; }
     .touch-hold {
       grid-column: 1 / -1;
-      width: 138px;
-      height: 46px;
+      width: 100%;
+      height: 52px;
       font-size: 15px;
       color: #88f7ff;
     }
     .touch-back,
     .touch-confirm,
+    .touch-mute,
     .touch-pause,
-    .touch-restart {
-      display: none;
+    .touch-gameover-restart { display: none; }
+    .touch-mute,
+    .touch-pause,
+    .touch-gameover-restart { margin-left: auto; }
+    .touch-pause {
+      position: fixed;
+      right: max(12px, env(safe-area-inset-right));
+      bottom: max(12px, env(safe-area-inset-bottom));
+      width: 52px;
+      height: 52px;
+      padding: 0;
+      font-size: 22px;
+      color: #ffe600;
+    }
+    #touchControls.show-buttons .touch-pause {
+      right: auto;
+      left: calc(50% - 26px);
     }
     #touchControls.show-back .touch-back,
     #touchControls.show-confirm .touch-confirm,
+    #touchControls.show-mute .touch-mute,
     #touchControls.show-pause .touch-pause,
-    #touchControls.show-restart .touch-restart {
+    #touchControls.show-gameover-restart .touch-gameover-restart { display: block; }
+    .touch-layer {
+      display: none;
+      position: fixed;
+      inset: 0;
+      align-items: center;
+      justify-content: center;
+      padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+      background: rgba(2,3,12,0.78);
+      backdrop-filter: blur(5px);
+      pointer-events: auto;
+    }
+    #touchControls.tutorial-open .touch-tutorial-layer,
+    #touchControls.show-pause-menu .touch-pause-layer { display: flex; }
+    .touch-dialog {
+      width: min(390px, 100%);
+      max-height: 100%;
+      overflow: auto;
+      border: 2px solid rgba(98,220,255,0.72);
+      border-radius: 16px;
+      padding: 20px;
+      background: linear-gradient(180deg, rgba(20,24,48,0.98), rgba(5,7,20,0.98));
+      color: #f3f5ff;
+      box-shadow: 0 16px 50px rgba(0,0,0,0.65), 0 0 28px rgba(40,195,255,0.2);
+      text-align: center;
+    }
+    .touch-dialog h2 {
+      margin: 0 0 8px;
+      color: #ffe600;
+      font-size: 24px;
+    }
+    .touch-dialog-copy {
+      margin: 0 0 14px;
+      color: #cbd4f5;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+    .touch-gesture-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .touch-gesture {
+      min-height: 62px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      border: 1px solid rgba(255,255,255,0.18);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.06);
+      font-size: 12px;
+      line-height: 1.25;
+    }
+    .touch-gesture strong { color: #88f7ff; font-size: 17px; }
+    .touch-dialog-actions,
+    .touch-mode-picker,
+    .touch-restart-confirm {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .touch-dialog-button {
+      min-height: 52px;
+      border: 1px solid rgba(255,255,255,0.3);
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: rgba(36,42,70,0.96);
+      color: #f4f5ff;
+      font: bold 14px monospace;
+      pointer-events: auto;
+      touch-action: manipulation;
+    }
+    .touch-dialog-button.primary,
+    .touch-dialog-button.is-selected {
+      border-color: rgba(255,230,0,0.8);
+      background: linear-gradient(180deg, rgba(105,82,8,0.98), rgba(48,35,4,0.98));
+      color: #ffe600;
+    }
+    .touch-dialog-button.is-pressed { transform: translateY(1px) scale(0.99); }
+    .touch-pause-dialog { width: min(340px, 100%); }
+    .touch-pause-actions {
+      display: grid;
+      gap: 9px;
+      margin-top: 14px;
+    }
+    .touch-pause-actions > .touch-dialog-button { width: 100%; }
+    .touch-mode-label {
       display: block;
+      margin: 14px 0 7px;
+      color: #aebae5;
+      font-size: 12px;
+    }
+    .touch-restart-confirm {
+      display: none;
+      margin-top: 9px;
+      padding-top: 9px;
+      border-top: 1px solid rgba(255,255,255,0.16);
+    }
+    .touch-pause-dialog.is-confirming .touch-restart-request { display: none; }
+    .touch-pause-dialog.is-confirming .touch-restart-confirm { display: grid; }
+    .touch-danger { color: #ff9b9b; border-color: rgba(255,80,80,0.5); }
+    @media (max-height: 600px) {
+      .touch-dialog { padding: 14px; }
+      .touch-dialog h2 { font-size: 20px; }
+      .touch-dialog-copy { margin-bottom: 9px; }
+      .touch-gesture { min-height: 48px; }
+      .touch-gesture-list { margin-bottom: 10px; }
     }
     @media (pointer: fine) and (min-width: 901px) {
       #touchControls { display: none !important; }

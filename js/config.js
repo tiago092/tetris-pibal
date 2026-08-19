@@ -21,6 +21,29 @@ const MENU_CONFIG = {
   footerColor: 'rgba(210,218,255,0.58)',
 };
 
+// ---- Controles tactiles ----
+const TOUCH_CONFIG = {
+  storageKey: 'tetris-pibal.touch-controls.v1',
+  tutorialVersion: 1,
+  defaultMode: 'gestures',
+  tapSlopPx: 12,
+  minMoveStepPx: 18,
+  moveStepCellRatio: 0.85,
+  gestureDominance: 1.15,
+  holdDistancePx: 50,
+  softDropDistancePx: 24,
+  softDropHoldMs: 150,
+  softDropRepeatMs: 65,
+  hardDropDistancePx: 64,
+  hardDropMaxMs: 220,
+  hardDropVelocityPxMs: 0.6,
+  buttonRepeatDelayMs: 160,
+  buttonMoveRepeatMs: 70,
+  buttonSoftDropRepeatMs: 55,
+  layoutGapPx: 8,
+  hapticMs: 8,
+};
+
 // ---- Pantalla de victoria ----
 const WIN_CONFIG = {
   video: 'assets/video/ganaste.mp4',

@@ -1010,7 +1010,7 @@ function stopIntroMusic() {
 }
 
 function goToMenu(restartMusic=true) {
-  inMenu=true; inNameEntry=false; inDifficulty=false; inLeaderboard=false; inCountdown=false; inCredits=false;
+  inMenu=true; inNameEntry=false; inDifficulty=false; inLeaderboard=false; inCountdown=false; inTouchTutorial=false; inCredits=false;
   menuUnlocked=true; menuPulse=0; menuOption=0; menuEnterTime=performance.now();
   stopMusic();
   stopLevelBgVideo();
